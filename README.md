@@ -1,6 +1,6 @@
 # Marketing AI
 
-Gradio-app voor het genereren van marketingteksten en het bewerken van foto's.
+Gradio-app voor het genereren van marketingteksten.
 
 ## Railway deployment
 
@@ -18,6 +18,6 @@ Voeg deze waarden toe via de Railway service-instellingen:
 - `AZURE_OPENAI_DEPLOYMENT`
 - `AZURE_OPENAI_API_VERSION` (optioneel, standaard `2024-10-21`)
 
-De SQLite-database en het model-checkpoint staan in de repository. Railway's
-lokale schijf is standaard tijdelijk; gebruik een Railway Volume als gegevens
-na redeploys behouden moeten blijven.
+De SQLite-database staat in de repository. Railway's lokale schijf is standaard
+tijdelijk; gebruik een Railway Volume als gegevens na redeploys behouden moeten
+blijven.

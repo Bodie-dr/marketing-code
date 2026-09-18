@@ -168,29 +168,6 @@ def create_schema(connection: SQLiteConnection) -> None:
         CONSTRAINT unique_chunk_embedding UNIQUE(chunk_id, model_name)
     );
 
-    CREATE TABLE IF NOT EXISTS photo_references (
-        id TEXT PRIMARY KEY,
-        filename TEXT NOT NULL,
-        content_type TEXT NOT NULL,
-        checksum_sha256 TEXT NOT NULL UNIQUE,
-        image_data BLOB NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (NOW()),
-        updated_at TEXT NOT NULL DEFAULT (NOW())
-    );
-
-    CREATE TABLE IF NOT EXISTS training_photo_pairs (
-        id TEXT PRIMARY KEY,
-        split TEXT NOT NULL CHECK (split IN ('train', 'val')),
-        input_filename TEXT NOT NULL,
-        target_filename TEXT NOT NULL,
-        input_image BLOB NOT NULL,
-        target_image BLOB NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (NOW()),
-        updated_at TEXT NOT NULL DEFAULT (NOW()),
-        CONSTRAINT unique_training_photo_pair
-            UNIQUE(split, input_filename, target_filename)
-    );
-
     CREATE TABLE IF NOT EXISTS project_onedrive_folders (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

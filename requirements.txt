@@ -4,9 +4,7 @@ sentence-transformers
 numpy
 gradio
 pillow
-scikit-image
-torch
-torchvision
 openai
 pypdf
 tqdm
+gunicorn

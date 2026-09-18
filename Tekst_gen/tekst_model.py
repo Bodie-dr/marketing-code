@@ -110,6 +110,32 @@ def lees_document(document):
     return ""
 
 
+def generate_text(
+    nieuwe_opdracht: str,
+    document=None,
+    style_text="",
+    prompt="",
+    modus="Nieuwe tekst genereren",
+    aanleiding="",
+    insteek="",
+    doelgroep="",
+    bedrijf="",
+    kanaal="LinkedIn",
+):
+    return genereer_factuurtekst(
+        nieuwe_opdracht,
+        document=document,
+        style_text=style_text,
+        prompt=prompt,
+        modus=modus,
+        aanleiding=aanleiding,
+        insteek=insteek,
+        doelgroep=doelgroep,
+        bedrijf=bedrijf,
+        kanaal=kanaal,
+    )
+
+
 def genereer_factuurtekst(
     nieuwe_opdracht: str,
     document=None,

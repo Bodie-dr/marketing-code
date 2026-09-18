@@ -16,10 +16,6 @@ from database.database import (
     create_connection,
     create_schema,
 )
-from foto_generation.foto_model import (
-    ensure_training_photo_pairs_table,
-    import_local_training_pairs,
-)
 from database.document_reader import (
     calculate_sha256,
     read_image_metadata,
@@ -438,41 +434,6 @@ def ingest_document_root(
     return statistics
 
 
-def import_training_photo_pairs(
-    train_input_dir: Path,
-    train_target_dir: Path,
-    val_input_dir: Path,
-    val_target_dir: Path,
-) -> tuple[int, int]:
-    connection = create_connection()
-    try:
-        create_schema(connection)
-        ensure_training_photo_pairs_table(connection)
-
-        train_imported = import_local_training_pairs(
-            connection,
-            "train",
-            train_input_dir,
-            train_target_dir,
-        )
-        val_imported = import_local_training_pairs(
-            connection,
-            "val",
-            val_input_dir,
-            val_target_dir,
-        )
-
-        connection.commit()
-        logger.info(
-            "Trainingfoto's geïmporteerd: train=%s, val=%s",
-            train_imported,
-            val_imported,
-        )
-        return train_imported, val_imported
-    finally:
-        connection.close()
-
-
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -493,34 +454,6 @@ def parse_arguments() -> argparse.Namespace:
         type=str,
         default=PROJECT_NAME,
         help="Projectnaam in SQLite.",
-    )
-
-    parser.add_argument(
-        "--train-input-dir",
-        type=str,
-        default="data/train/input",
-        help="Map met training-inputfoto's.",
-    )
-
-    parser.add_argument(
-        "--train-target-dir",
-        type=str,
-        default="data/train/target",
-        help="Map met training-targetfoto's.",
-    )
-
-    parser.add_argument(
-        "--val-input-dir",
-        type=str,
-        default="data/val/input",
-        help="Map met validatie-inputfoto's.",
-    )
-
-    parser.add_argument(
-        "--val-target-dir",
-        type=str,
-        default="data/val/target",
-        help="Map met validatie-targetfoto's.",
     )
 
     parser.add_argument(
@@ -558,23 +491,6 @@ def main() -> int:
     )
 
     try:
-        if arguments.preview:
-            logger.info(
-                "Previewmodus is actief; trainingsfoto's worden niet geïmporteerd."
-            )
-        else:
-            train_imported, val_imported = import_training_photo_pairs(
-                train_input_dir=Path(arguments.train_input_dir),
-                train_target_dir=Path(arguments.train_target_dir),
-                val_input_dir=Path(arguments.val_input_dir),
-                val_target_dir=Path(arguments.val_target_dir),
-            )
-            logger.info(
-                "Trainingsfoto's uit mappen in DB gezet: train=%s, val=%s",
-                train_imported,
-                val_imported,
-            )
-
         statistics = ingest_document_root(
             folder=folder,
             project_name=arguments.project,

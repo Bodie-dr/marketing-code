@@ -22,17 +22,6 @@ if not DOCUMENTS_FOLDER.is_absolute():
     DOCUMENTS_FOLDER = BASE_DIR / DOCUMENTS_FOLDER
 
 
-REFERENCE_PHOTOS_FOLDER = Path(
-    os.getenv(
-        "REFERENCE_PHOTOS_FOLDER",
-        str(DOCUMENTS_FOLDER / "TVB" / "licht-referenties")
-    )
-)
-
-if not REFERENCE_PHOTOS_FOLDER.is_absolute():
-    REFERENCE_PHOTOS_FOLDER = BASE_DIR / REFERENCE_PHOTOS_FOLDER
-
-
 PROJECT_NAME = os.getenv(
     "PROJECT_NAME",
     "TVB Marketing"

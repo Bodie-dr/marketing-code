@@ -4,16 +4,11 @@ from pathlib import Path
 
 import gradio as gr
 from docx import Document
-from docx.shared import Inches
-from PIL import Image, ImageDraw
 
-from foto_generation.foto_model import edit_photo
 from database.database import create_connection, create_schema
 from database.document_repository import get_project_names
-from database.config import REFERENCE_PHOTOS_FOLDER
 
-
-from Tekst_gen.tekst_model import genereer_factuurtekst
+from Tekst_gen.tekst_model import generate_text
 
 
 def initialize_database() -> None:
@@ -42,73 +37,6 @@ def laad_bedrijven():
     )
 
 
-def validate_and_edit(
-    input_image,
-    prompt,
-    logo,
-    opacity,
-    logo_position,
-):
-    if input_image is None:
-        raise gr.Error("Upload eerst een foto.")
-
-    try:
-        return edit_photo(
-            input_image,
-            prompt,
-            logo,
-            opacity,
-            logo_position,
-        )
-    except FileNotFoundError as error:
-        if "Checkpoint bestaat niet" not in str(error):
-            raise
-
-        raise gr.Error(
-            "Het fotomodel is nog niet getraind. "
-            "Train eerst een model met: python foto_model.py train"
-        ) from error
-
-
-def get_stock_image(output_dir: Path) -> Path:
-    image_extensions = {".jpg", ".jpeg", ".png", ".webp"}
-    search_dirs = [
-        REFERENCE_PHOTOS_FOLDER,
-        Path(__file__).resolve().parent / "data" / "train" / "input",
-        Path(__file__).resolve().parent / "data" / "val" / "input",
-    ]
-
-    for search_dir in search_dirs:
-        if not search_dir.exists():
-            continue
-
-        image_paths = sorted(
-            path
-            for path in search_dir.rglob("*")
-            if path.is_file() and path.suffix.lower() in image_extensions
-        )
-        if image_paths:
-            return image_paths[0]
-
-    placeholder_path = output_dir / "stock-image-placeholder.png"
-    if not placeholder_path.exists():
-        image = Image.new("RGB", (1600, 900), "#e8eef2")
-        draw = ImageDraw.Draw(image)
-        draw.rectangle(
-            (40, 40, 1560, 860),
-            outline="#2ba7a2",
-            width=8,
-        )
-        draw.text(
-            (520, 425),
-            "PLAATS ECHTE FOTO HIER",
-            fill="#1e2b4f",
-        )
-        image.save(placeholder_path)
-
-    return placeholder_path
-
-
 def save_generated_word(text):
     if not text or not text.strip():
         return None
@@ -124,10 +52,6 @@ def save_generated_word(text):
         bestand_path = Path(bestand.name)
 
     document = Document()
-    document.add_picture(
-        str(get_stock_image(output_dir)),
-        width=Inches(6.5),
-    )
     for regel in text.strip().splitlines():
         document.add_paragraph(regel)
     document.save(bestand_path)
@@ -156,7 +80,7 @@ def validate_and_generate(
         )
 
     try:
-        resultaat = genereer_factuurtekst(
+        resultaat = generate_text(
             opdracht.strip(),
             document=document,
             style_text=style_text or "",
@@ -277,9 +201,9 @@ select {
 
     gr.Markdown(
         """
-# Factuurgenerator & Fotomodel
+# Factuurgenerator
 
-Gebruik de tabs hieronder om foto's te bewerken of automatisch factuurteksten te genereren.
+Genereer automatisch marketingteksten en download ze als Word-document.
 """
     )
 
@@ -396,87 +320,6 @@ Gebruik de tabs hieronder om foto's te bewerken of automatisch factuurteksten te
                 bedrijf,
                 kanaal,
                 download_file,
-            ],
-        )
-
-    # ==================================================
-    # TAB 2 - FOTO BEWERKING
-    # ==================================================
-
-    with gr.Tab("Foto Bewerking"):
-
-        with gr.Row():
-
-            with gr.Column(scale=5, elem_classes="panel"):
-
-                photo = gr.Image(
-                    type="filepath",
-                    label="Originele foto",
-                    sources=["upload"],
-                )
-
-                prompt = gr.Textbox(
-                    label="Fotobewerking",
-                    lines=4,
-                    placeholder=(
-                        "Bijvoorbeeld: maak de foto zwart-wit "
-                        "of geef de foto een zachte gloed"
-                    ),
-                )
-
-                logo = gr.Checkbox(
-                    label="Logo toevoegen",
-                    value=False,
-                )
-
-                opacity = gr.Slider(
-                    minimum=0,
-                    maximum=100,
-                    value=50,
-                    step=5,
-                    label="Logo transparantie (%)",
-                )
-
-                logo_position = gr.Dropdown(
-                    choices=[
-                        "Midden",
-                        "Linksboven",
-                        "Rechtsboven",
-                        "Linksonder",
-                        "Rechtsonder",
-                    ],
-                    value="Midden",
-                    label="Logo positie",
-                )
-
-                edit_button = gr.Button(
-                    "Foto aanpassen",
-                    variant="primary",
-                )
-
-            with gr.Column(scale=6, elem_classes="panel"):
-
-                result = gr.Image(
-                    label="Resultaat",
-                    format="png",
-                )
-
-                status = gr.Markdown(
-                    "Upload een foto en klik op 'Foto aanpassen'."
-                )
-
-        edit_button.click(
-            fn=validate_and_edit,
-            inputs=[
-                photo,
-                prompt,
-                logo,
-                opacity,
-                logo_position,
-            ],
-            outputs=[
-                result,
-                status,
             ],
         )
 

@@ -1,0 +1,1 @@
+"""Text generation package for the marketing application."""
