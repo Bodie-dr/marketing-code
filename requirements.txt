@@ -7,3 +7,6 @@ pillow
 scikit-image
 torch
 torchvision
+openai
+pypdf
+tqdm

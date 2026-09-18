@@ -1,7 +1,7 @@
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from config import (
+from database.config import (
     EMBEDDING_MODEL_NAME,
     EMBEDDING_DIMENSION,
 )

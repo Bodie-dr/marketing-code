@@ -6,11 +6,11 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
 load_dotenv(Path(__file__).with_name(".env"), override=True)
-from database import (
+from database.database import (
     create_connection,
 )
-from config import EMBEDDING_MODEL_NAME, PROJECT_NAME
-from embedding_service import EmbeddingService
+from database.config import EMBEDDING_MODEL_NAME, PROJECT_NAME
+from database.embedding_service import EmbeddingService
 
 
 def zoek_relevante_data(

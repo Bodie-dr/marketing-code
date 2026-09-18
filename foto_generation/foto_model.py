@@ -25,8 +25,8 @@ from torchvision.models import VGG16_Weights, vgg16
 from torchvision.transforms import functional as TF
 from torchvision.utils import make_grid, save_image
 
-from config import REFERENCE_PHOTOS_FOLDER
-from database import create_connection
+from database.config import REFERENCE_PHOTOS_FOLDER
+from database.database import create_connection
 
 
 SUPPORTED_EXTENSIONS = {

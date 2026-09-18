@@ -8,7 +8,7 @@ from uuid import UUID
 import numpy as np
 from dotenv import load_dotenv
 
-from config import DATABASE_PATH
+from database.config import DATABASE_PATH
 
 
 logger = logging.getLogger(__name__)

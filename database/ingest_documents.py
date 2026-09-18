@@ -4,28 +4,28 @@ import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from chunking import split_text_into_chunks
-from config import (
+from database.chunking import split_text_into_chunks
+from database.config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     DOCUMENTS_FOLDER,
     PROJECT_NAME,
     SUPPORTED_EXTENSIONS,
 )
-from database import (
+from database.database import (
     create_connection,
     create_schema,
 )
-from foto_model import (
+from foto_generation.foto_model import (
     ensure_training_photo_pairs_table,
     import_local_training_pairs,
 )
-from document_reader import (
+from database.document_reader import (
     calculate_sha256,
     read_image_metadata,
     read_docx,
 )
-from document_repository import (
+from database.document_repository import (
     checksum_exists,
     create_document,
     create_document_version,
@@ -35,7 +35,7 @@ from document_repository import (
     link_project_to_onedrive_folder,
     set_current_version,
 )
-from embedding_service import EmbeddingService
+from database.embedding_service import EmbeddingService
 
 
 logging.basicConfig(

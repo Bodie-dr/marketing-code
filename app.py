@@ -6,14 +6,21 @@ from docx import Document
 from docx.shared import Inches
 from PIL import Image, ImageDraw
 
-from foto_model import edit_photo
-from importlib import import_module
-from database import create_connection
-from document_repository import get_project_names
-from config import REFERENCE_PHOTOS_FOLDER
+from foto_generation.foto_model import edit_photo
+from database.database import create_connection, create_schema
+from database.document_repository import get_project_names
+from database.config import REFERENCE_PHOTOS_FOLDER
 
 
-genereer_factuurtekst = import_module("tekst_model").genereer_factuurtekst
+from Tekst_gen.tekst_model import genereer_factuurtekst
+
+
+def initialize_database() -> None:
+    connection = create_connection()
+    try:
+        create_schema(connection)
+    finally:
+        connection.close()
 
 
 def laad_bedrijven():
@@ -485,4 +492,5 @@ Gebruik de tabs hieronder om foto's te bewerken of automatisch factuurteksten te
     # Kept intentionally empty to avoid duplicate callbacks after the tab reorder.
 
 if __name__ == "__main__":
-    demo.launch(share=True, server_name="0.0.0.0", server_port=7860)
+    initialize_database()
+    demo.launch(server_name="0.0.0.0", server_port=7860)

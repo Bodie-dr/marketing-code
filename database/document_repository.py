@@ -3,13 +3,13 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import numpy as np
-from chunking import TextChunk
-from config import (
+from database.chunking import TextChunk
+from database.config import (
     EMBEDDING_DIMENSION,
     EMBEDDING_MODEL_NAME,
 )
-from document_reader import get_modified_datetime
-from database import SQLiteConnection
+from database.document_reader import get_modified_datetime
+from database.database import SQLiteConnection
 
 
 def get_project_names(

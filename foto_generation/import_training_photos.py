@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from database import create_connection, create_schema
-from foto_model import (
+from database.database import create_connection, create_schema
+from foto_generation.foto_model import (
     ensure_training_photo_pairs_table,
     import_local_training_pairs,
 )
