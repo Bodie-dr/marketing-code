@@ -1,27 +1,23 @@
----
-title: Marketing AI
-emoji: "📣"
-colorFrom: blue
-colorTo: green
-sdk: gradio
-sdk_version: 5.49.1
-app_file: app.py
-pinned: false
----
-
 # Marketing AI
 
 Gradio-app voor het genereren van marketingteksten en het bewerken van foto's.
 
-## Space secrets
+## Railway deployment
 
-Voeg deze waarden toe via **Settings > Secrets and variables** in Hugging Face:
+Maak in Railway een Python-service aan vanuit deze repository. Railway gebruikt
+de `Procfile` om de app te starten en stelt automatisch de `PORT`-variabele in.
+
+De app luistert op `0.0.0.0` en gebruikt de Railway-poort automatisch.
+
+## Environment variables
+
+Voeg deze waarden toe via de Railway service-instellingen:
 
 - `AZURE_OPENAI_API_KEY`
 - `AZURE_OPENAI_ENDPOINT`
 - `AZURE_OPENAI_DEPLOYMENT`
 - `AZURE_OPENAI_API_VERSION` (optioneel, standaard `2024-10-21`)
 
-De meegeleverde SQLite-database en model-checkpoint worden tijdens het starten
-van de Space gebruikt. Hugging Face Spaces heeft geen permanente lokale opslag
-zonder een gekoppelde Storage upgrade.
+De SQLite-database en het model-checkpoint staan in de repository. Railway's
+lokale schijf is standaard tijdelijk; gebruik een Railway Volume als gegevens
+na redeploys behouden moeten blijven.

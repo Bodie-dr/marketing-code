@@ -1,4 +1,5 @@
 import tempfile
+import os
 from pathlib import Path
 
 import gradio as gr
@@ -493,4 +494,7 @@ Gebruik de tabs hieronder om foto's te bewerken of automatisch factuurteksten te
 
 if __name__ == "__main__":
     initialize_database()
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.getenv("PORT", "7860")),
+    )
