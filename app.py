@@ -485,4 +485,4 @@ Gebruik de tabs hieronder om foto's te bewerken of automatisch factuurteksten te
     # Kept intentionally empty to avoid duplicate callbacks after the tab reorder.
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(share=True, server_name="0.0.0.0", server_port=7860)
