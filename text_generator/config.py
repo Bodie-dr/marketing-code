@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import os
 
 from dotenv import load_dotenv
@@ -79,3 +79,4 @@ SUPPORTED_EXTENSIONS = {
     ".jpeg",
     ".png",
 }
+

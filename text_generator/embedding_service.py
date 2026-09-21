@@ -76,3 +76,5 @@ class EmbeddingService:
         return embeddings.astype(
             np.float32
         )
+
+

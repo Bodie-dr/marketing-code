@@ -196,3 +196,5 @@ def create_schema(connection: SQLiteConnection) -> None:
         connection.rollback()
         raise
 
+
+

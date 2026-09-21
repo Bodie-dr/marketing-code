@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import hashlib
 import re
 from datetime import datetime, timezone
@@ -142,3 +142,4 @@ def get_modified_datetime(
         timestamp,
         tz=timezone.utc
     )
+

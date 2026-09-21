@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+﻿from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -88,3 +88,4 @@ def split_text_into_chunks(
         start = next_start
 
     return chunks
+
