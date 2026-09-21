@@ -1,0 +1,10 @@
+python-docx
+python-dotenv
+sentence-transformers
+numpy
+gradio
+pillow
+openai
+pypdf
+tqdm
+gunicorn
