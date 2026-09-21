@@ -1,27 +1,27 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import argparse
 import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from text_generator.chunking import split_text_into_chunks
-from text_generator.config import (
+from chunking import split_text_into_chunks
+from config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     DOCUMENTS_FOLDER,
     PROJECT_NAME,
     SUPPORTED_EXTENSIONS,
 )
-from text_generator.database import (
+from database import (
     create_connection,
     create_schema,
 )
-from text_generator.document_reader import (
+from document_reader import (
     calculate_sha256,
     read_image_metadata,
     read_docx,
 )
-from text_generator.document_repository import (
+from document_repository import (
     checksum_exists,
     create_document,
     create_document_version,
@@ -31,7 +31,7 @@ from text_generator.document_repository import (
     link_project_to_onedrive_folder,
     set_current_version,
 )
-from text_generator.embedding_service import EmbeddingService
+from embedding_service import EmbeddingService
 
 
 logging.basicConfig(

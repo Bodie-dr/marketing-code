@@ -1,6 +1,6 @@
-import numpy as np
+﻿import numpy as np
 
-from text_generator.config import (
+from config import (
     EMBEDDING_MODEL_NAME,
     EMBEDDING_DIMENSION,
 )

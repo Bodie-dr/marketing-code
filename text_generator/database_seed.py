@@ -1,4 +1,4 @@
-from text_generator.database import create_connection
+﻿from database import create_connection
 
 
 connection = create_connection()
@@ -39,3 +39,4 @@ try:
     print("SQLite-seed voltooid.")
 finally:
     connection.close()
+

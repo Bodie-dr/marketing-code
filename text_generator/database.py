@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,7 +8,7 @@ from uuid import UUID
 import numpy as np
 from dotenv import load_dotenv
 
-from text_generator.config import DATABASE_PATH
+from config import DATABASE_PATH
 
 
 logger = logging.getLogger(__name__)
@@ -195,3 +195,4 @@ def create_schema(connection: SQLiteConnection) -> None:
     except Exception:
         connection.rollback()
         raise
+

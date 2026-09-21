@@ -14,10 +14,10 @@ import gradio as gr
 from docx import Document
 from docx.shared import Inches
 
-from text_generator.database import create_connection, create_schema
-from text_generator.document_repository import get_project_names
+from database import create_connection, create_schema
+from document_repository import get_project_names
 
-from text_generator.text_generation import generate_text
+from text_generation import generate_text
 
 
 def initialize_database() -> None:

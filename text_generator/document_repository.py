@@ -1,15 +1,15 @@
-import hashlib
+﻿import hashlib
 from pathlib import Path
 from uuid import UUID, uuid4
 
 import numpy as np
-from text_generator.chunking import TextChunk
-from text_generator.config import (
+from chunking import TextChunk
+from config import (
     EMBEDDING_DIMENSION,
     EMBEDDING_MODEL_NAME,
 )
-from text_generator.document_reader import get_modified_datetime
-from text_generator.database import SQLiteConnection
+from document_reader import get_modified_datetime
+from database import SQLiteConnection
 
 
 def get_project_names(

@@ -1,4 +1,4 @@
-import os
+﻿import os
 from pathlib import Path
 
 import numpy as np
@@ -6,10 +6,10 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
 load_dotenv(Path(__file__).with_name(".env"), override=True)
-from text_generator.database import (
+from database import (
     create_connection,
 )
-from text_generator.config import EMBEDDING_MODEL_NAME, PROJECT_NAME
+from config import EMBEDDING_MODEL_NAME, PROJECT_NAME
 
 
 def zoek_relevante_data(
@@ -18,7 +18,7 @@ def zoek_relevante_data(
     aantal: int = 5,
 ) -> str:
     """Zoek de meest relevante opgeslagen documentchunks voor de opdracht."""
-    from text_generator.embedding_service import EmbeddingService
+    from embedding_service import EmbeddingService
 
     embedding_service = EmbeddingService()
     zoekopdracht = f"Bedrijf: {bedrijf}\nOpdracht: {opdracht}" if bedrijf else opdracht
