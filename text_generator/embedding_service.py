@@ -1,5 +1,4 @@
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from text_generator.config import (
     EMBEDDING_MODEL_NAME,
@@ -8,15 +7,21 @@ from text_generator.config import (
 
 
 class EmbeddingService:
-    def __init__(self) -> None:
-        print(
-            "Embeddingmodel laden:",
-            EMBEDDING_MODEL_NAME
-        )
+    _model = None
 
-        self.model = SentenceTransformer(
-            EMBEDDING_MODEL_NAME
-        )
+    def __init__(self) -> None:
+        from sentence_transformers import SentenceTransformer
+
+        if EmbeddingService._model is None:
+            print(
+                "Embeddingmodel laden:",
+                EMBEDDING_MODEL_NAME,
+            )
+            EmbeddingService._model = SentenceTransformer(
+                EMBEDDING_MODEL_NAME
+            )
+
+        self.model = EmbeddingService._model
 
         actual_dimension = (
             self.model

@@ -10,7 +10,6 @@ from text_generator.database import (
     create_connection,
 )
 from text_generator.config import EMBEDDING_MODEL_NAME, PROJECT_NAME
-from text_generator.embedding_service import EmbeddingService
 
 
 def zoek_relevante_data(
@@ -19,6 +18,8 @@ def zoek_relevante_data(
     aantal: int = 5,
 ) -> str:
     """Zoek de meest relevante opgeslagen documentchunks voor de opdracht."""
+    from text_generator.embedding_service import EmbeddingService
+
     embedding_service = EmbeddingService()
     zoekopdracht = f"Bedrijf: {bedrijf}\nOpdracht: {opdracht}" if bedrijf else opdracht
     query_embedding = embedding_service.create_embeddings([zoekopdracht])[0]

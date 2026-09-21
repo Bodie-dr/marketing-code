@@ -8,3 +8,5 @@ openai
 pypdf
 tqdm
 gunicorn
+torch
+torchvision
