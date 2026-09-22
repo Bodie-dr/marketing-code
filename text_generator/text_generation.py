@@ -15,6 +15,7 @@ from config import EMBEDDING_MODEL_NAME, PROJECT_NAME
 def zoek_relevante_data(
     opdracht: str,
     bedrijf: str = "",
+    kanaal: str = "LinkedIn",
     aantal: int = 5,
 ) -> str:
     """Zoek de meest relevante opgeslagen documentchunks voor de opdracht."""
@@ -23,26 +24,49 @@ def zoek_relevante_data(
     embedding_service = EmbeddingService()
     zoekopdracht = f"Bedrijf: {bedrijf}\nOpdracht: {opdracht}" if bedrijf else opdracht
     query_embedding = embedding_service.create_embeddings([zoekopdracht])[0]
+    project_name = bedrijf.strip() or PROJECT_NAME
+    kanaal = kanaal.strip().casefold()
+    if kanaal in {"linkedin", "instagram"}:
+        folder_patterns = ["%social_media_teksten%"]
+    elif kanaal == "website":
+        folder_patterns = [
+            "%website_vactuur_teksten%",
+            "%website_factuur_teksten%",
+        ]
+    else:
+        folder_patterns = []
+
     connection = create_connection()
 
     try:
-        with connection.cursor() as cursor:
-            cursor.execute(
+        def fetch_results(folder_filter=None):
+            with connection.cursor() as cursor:
+                query = """
+                    SELECT dc.content, e.embedding
+                    FROM document_chunks AS dc
+                    JOIN document_versions AS dv ON dv.id = dc.version_id
+                    JOIN documents AS d ON d.id = dv.document_id
+                    JOIN projects AS p ON p.id = d.project_id
+                    JOIN embeddings AS e ON e.chunk_id = dc.id
+                    WHERE p.name = %s
+                      AND d.is_active = TRUE
+                      AND dv.version_number = d.current_version
+                      AND e.model_name = %s
                 """
-                SELECT dc.content, e.embedding
-                FROM document_chunks AS dc
-                JOIN document_versions AS dv ON dv.id = dc.version_id
-                JOIN documents AS d ON d.id = dv.document_id
-                JOIN projects AS p ON p.id = d.project_id
-                JOIN embeddings AS e ON e.chunk_id = dc.id
-                WHERE p.name = %s
-                  AND d.is_active = TRUE
-                  AND dv.version_number = d.current_version
-                  AND e.model_name = %s
-                """,
-                (PROJECT_NAME, EMBEDDING_MODEL_NAME),
-            )
-            resultaten = cursor.fetchall()
+                parameters = [project_name, EMBEDDING_MODEL_NAME]
+                if folder_filter:
+                    query += " AND lower(d.relative_path) LIKE lower(%s)"
+                    parameters.append(folder_filter)
+                cursor.execute(query, parameters)
+                return cursor.fetchall()
+
+        resultaten = []
+        for folder_pattern in folder_patterns:
+            resultaten = fetch_results(folder_pattern)
+            if resultaten:
+                break
+        if not resultaten and folder_patterns:
+            resultaten = fetch_results()
     finally:
         connection.close()
 
@@ -179,7 +203,11 @@ def genereer_factuurtekst(
         )
 
     documenttekst = lees_document(document) or style_text.strip()
-    opgeslagen_data = zoek_relevante_data(nieuwe_opdracht, bedrijf)
+    opgeslagen_data = zoek_relevante_data(
+        nieuwe_opdracht,
+        bedrijf,
+        kanaal,
+    )
     extra_instructie = prompt.strip() or (
         "Volg de stijl en structuur uit het document of de stijltekst."
     )
