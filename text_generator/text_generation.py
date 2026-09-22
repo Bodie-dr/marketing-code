@@ -217,7 +217,15 @@ def genereer_factuurtekst(
     bedrijf = bedrijf.strip() or "Niet opgegeven"
     kanaal = kanaal.strip() or "LinkedIn"
 
-    taak_instructie = """
+    if modus == "Tekst herschrijven":
+        taak_instructie = """
+Herschrijf de oorspronkelijke tekst hieronder. Behoud de feitelijke inhoud,
+maar verbeter duidelijkheid, structuur, spelling en stijl. Maak de tekst
+geschikt voor het gekozen publicatiekanaal. Voeg geen nieuwe feiten toe.
+Geef alleen de herschreven tekst terug.
+"""
+    else:
+        taak_instructie = """
 Maak een volledig originele tekst. Gebruik de ingevoerde tekst alleen als
 achtergrond en inspiratie voor het onderwerp; kopieer of herschrijf die tekst
 niet letterlijk en neem geen bronopdracht over in je antwoord.
@@ -230,7 +238,7 @@ niet letterlijk en neem geen bronopdracht over in je antwoord.
 """
 
     model_prompt = f"""
-Je schrijft originele teksten voor een aannemersbedrijf in de bouw.
+Je schrijft teksten voor een aannemersbedrijf in de bouw.
 
 Gebruik de trainingsvoorbeelden en het geuploade document of de stijltekst als
 belangrijkste bron voor schrijfstijl, structuur, formele toon, vaktermen en de

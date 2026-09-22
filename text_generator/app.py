@@ -89,6 +89,7 @@ def validate_and_generate(
     document,
     style_text,
     prompt,
+    modus,
     aanleiding,
     insteek,
     doelgroep,
@@ -101,7 +102,12 @@ def validate_and_generate(
         if waarde and waarde.strip()
     )
 
-    if not opdracht:
+    if modus == "Tekst herschrijven" and not (document or style_text):
+        raise gr.Error(
+            "Upload of plak de oorspronkelijke tekst die je wilt herschrijven."
+        )
+
+    if modus != "Tekst herschrijven" and not opdracht:
         raise gr.Error(
             "Vul minimaal de aanleiding, insteek, doelgroep of het bedrijf in."
         )
@@ -112,7 +118,7 @@ def validate_and_generate(
             document=document,
             style_text=style_text or "",
             prompt=prompt or "",
-            modus="Nieuwe tekst genereren",
+            modus=modus or "Nieuwe tekst genereren",
             aanleiding=aanleiding or "",
             insteek=insteek or "",
             doelgroep=doelgroep or "",
@@ -421,24 +427,24 @@ with gr.Blocks(
     title="FotoModel & Factuurgenerator",
 ) as demo:
 
-    gr.Markdown(
-        """
-    # Factuurgeneratie
-
-    Genereer automatisch marketingteksten en download ze als Word-document.
-    """,
-        elem_id="factuur-title",
-    )
-
     # ==================================================
     # TAB 1 - FACTUURGENERATOR
     # ==================================================
 
-    with gr.Tab("Factuurgenerator"):
+    with gr.Tab("Factuurgeneratie"):
 
         gr.Markdown(
             """
-        # Originele tekst maken in de stijl van de trainingsteksten
+        # Factuurgeneratie
+
+        Genereer automatisch marketingteksten en download ze als Word-document.
+        """,
+            elem_id="factuur-title",
+        )
+
+        gr.Markdown(
+            """
+        ## Originele tekst maken in de stijl van de trainingsteksten
         """,
             elem_id="originele-tekst-title",
         )
@@ -456,6 +462,12 @@ with gr.Blocks(
                 "Plak hier een voorbeeldtekst of stijlregels, bijv.: korte zinnen, "
                 "formele toon, veel concrete termen."
             ),
+        )
+
+        modus = gr.Radio(
+            choices=["Nieuwe tekst genereren", "Tekst herschrijven"],
+            value="Nieuwe tekst genereren",
+            label="Functie",
         )
 
         tekst_prompt = gr.Textbox(
@@ -522,6 +534,7 @@ with gr.Blocks(
                 document,
                 style_text,
                 tekst_prompt,
+                modus,
                 aanleiding,
                 insteek,
                 doelgroep,
@@ -532,12 +545,24 @@ with gr.Blocks(
         )
 
         wis_button.click(
-            fn=lambda: (None, "", "", "", "", "", None, "LinkedIn", None),
+            fn=lambda: (
+                None,
+                "",
+                "",
+                "Nieuwe tekst genereren",
+                "",
+                "",
+                "",
+                None,
+                "LinkedIn",
+                None,
+            ),
             inputs=[],
             outputs=[
                 document,
                 style_text,
                 tekst_prompt,
+                modus,
                 aanleiding,
                 insteek,
                 doelgroep,
@@ -567,6 +592,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
 
     demo.launch(
+        share=True,
         server_name="0.0.0.0",
         server_port=port,
         theme=APP_THEME,
