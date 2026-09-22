@@ -11,10 +11,14 @@ load_dotenv(BASE_DIR / ".env")
 
 # Documenten
 
+DEFAULT_DOCUMENTS_FOLDER = BASE_DIR / "documents"
+if not DEFAULT_DOCUMENTS_FOLDER.exists():
+    DEFAULT_DOCUMENTS_FOLDER = BASE_DIR.parent / "documents"
+
 DOCUMENTS_FOLDER = Path(
     os.getenv(
         "DOCUMENTS_FOLDER",
-        str(BASE_DIR / "documents")
+        str(DEFAULT_DOCUMENTS_FOLDER)
     )
 )
 

@@ -1,4 +1,5 @@
-﻿import tempfile
+﻿import logging
+import tempfile
 import os
 import sys
 from pathlib import Path
@@ -14,7 +15,8 @@ import gradio as gr
 from docx import Document
 from docx.shared import Inches
 from database import create_connection, create_schema
-from document_repository import get_project_names
+from config import DOCUMENTS_FOLDER
+from document_repository import get_or_create_project, get_project_names
 
 from text_generation import generate_text
 
@@ -27,13 +29,24 @@ def initialize_database() -> None:
         connection.close()
 
 
+logger = logging.getLogger(__name__)
+
+
 def laad_bedrijven():
     connection = None
 
     try:
         connection = create_connection()
+        create_schema(connection)
         bedrijven = get_project_names(connection)
+        if not bedrijven and DOCUMENTS_FOLDER.is_dir():
+            for bedrijfsmap in sorted(DOCUMENTS_FOLDER.iterdir()):
+                if bedrijfsmap.is_dir():
+                    get_or_create_project(connection, bedrijfsmap.name)
+            connection.commit()
+            bedrijven = get_project_names(connection)
     except Exception:
+        logger.exception("Bedrijven konden niet uit de database worden geladen.")
         bedrijven = []
     finally:
         if connection is not None:
@@ -130,6 +143,33 @@ APP_CSS = """
     --tvb-secondary: #B8C4D2;
     --tvb-white: #FFFFFF;
 }
+/* Tekst boven en rondom invoervelden wit maken */
+.gradio-container label,
+.gradio-container label span,
+.gradio-container .label-wrap,
+.gradio-container .info,
+.gradio-container p {
+    color: #FFFFFF !important;
+}
+
+/* Markdown tekst op de donkerblauwe achtergrond */
+.gradio-container .prose,
+.gradio-container .prose p {
+    color: #FFFFFF !important;
+}
+
+/* Tekst IN invoervelden juist donker houden */
+.gradio-container input,
+.gradio-container textarea,
+.gradio-container select {
+    color: #222D4F !important;
+}
+
+/* Placeholder in invoervelden */
+.gradio-container input::placeholder,
+.gradio-container textarea::placeholder {
+    color: #6B7280 !important;
+}
 
 .gradio-container {
     background: linear-gradient(
@@ -190,7 +230,7 @@ button[variant="primary"] {
     font-weight: 700 !important;
     box-shadow: 0 4px 12px rgba(34,45,79,.3) !important;
 }
-``
+
 
 /* Hover */
 button.primary:hover,
@@ -239,6 +279,142 @@ select:focus {
     border-color: var(--tvb-green) !important;
     box-shadow: 0 0 0 3px rgba(56,181,168,.2) !important;
 }
+/* Voorkom witte randen bij scrollen */
+html,
+body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: #222D4F !important;
+    min-height: 100% !important;
+}
+
+body {
+    min-height: 100vh !important;
+}
+
+/* Laat Gradio de volledige pagina bedekken */
+.gradio-container {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    background-color: #222D4F !important;
+}
+/* =========================================
+   FIX: WITTE ZIJKANTEN BIJ SCROLLEN
+   ========================================= */
+
+html,
+body,
+gradio-app,
+.gradio-container,
+.main,
+main {
+    background: #222D4F !important;
+    background-color: #222D4F !important;
+}
+
+/* Hele browserbreedte gebruiken */
+html,
+body {
+    width: 100% !important;
+    min-width: 100% !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+}
+
+/* Gradio root volledig vullen */
+gradio-app {
+    display: block !important;
+    width: 100% !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Gradio container geen witte buitenruimte geven */
+.gradio-container {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+}
+/* Bovenste titelkaart */
+#factuur-title {
+    background: #FFFFFF !important;
+    border: 2px solid #B8C4D2 !important;
+    border-left: 7px solid #38B5A8 !important;
+    border-radius: 16px !important;
+    padding: 22px 26px !important;
+    margin-bottom: 18px !important;
+    box-shadow: 0 8px 25px rgba(34, 45, 79, 0.18) !important;
+}
+
+/* Alle tekst in de bovenste titelkaart donker houden */
+#factuur-title,
+#factuur-title h1,
+#factuur-title h2,
+#factuur-title h3,
+#factuur-title p,
+#factuur-title .prose,
+#factuur-title .prose p {
+    color: #222D4F !important;
+}
+
+/* Hoofdtitel */
+#factuur-title h1 {
+    color: #222D4F !important;
+    font-size: 3rem !important;
+    font-weight: 900 !important;
+    text-align: center !important;
+    border-bottom: 4px solid #38B5A8 !important;
+    padding-bottom: 12px !important;
+    margin-top: 0 !important;
+    margin-bottom: 14px !important;
+}
+
+/* Beschrijving onder de hoofdtitel */
+#factuur-title p {
+    color: #222D4F !important;
+    text-align: center !important;
+    font-size: 1.05rem !important;
+    margin-bottom: 0 !important;
+}
+
+/* Titelkaart in de Factuurgenerator-tab */
+#originele-tekst-title {
+    background: #FFFFFF !important;
+    border: 2px solid #B8C4D2 !important;
+    border-left: 7px solid #38B5A8 !important;
+    border-radius: 14px !important;
+    padding: 16px 20px !important;
+    margin-top: 14px !important;
+    margin-bottom: 18px !important;
+    box-shadow: 0 6px 18px rgba(34, 45, 79, 0.15) !important;
+}
+
+/* Tekst van de titel donkerblauw houden */
+#originele-tekst-title,
+#originele-tekst-title h1,
+#originele-tekst-title h2,
+#originele-tekst-title h3,
+#originele-tekst-title p,
+#originele-tekst-title .prose,
+#originele-tekst-title .prose p {
+    color: #222D4F !important;
+}
+
+/* Opmaak van de tweede titel */
+#originele-tekst-title h2 {
+    color: #222D4F !important;
+    font-size: 1.55rem !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+    border: none !important;
+}
 """
 
 with gr.Blocks(
@@ -247,10 +423,11 @@ with gr.Blocks(
 
     gr.Markdown(
         """
-# Factuurgenerator
+    # Factuurgeneratie
 
-Genereer automatisch marketingteksten en download ze als Word-document.
-"""
+    Genereer automatisch marketingteksten en download ze als Word-document.
+    """,
+        elem_id="factuur-title",
     )
 
     # ==================================================
@@ -261,8 +438,9 @@ Genereer automatisch marketingteksten en download ze als Word-document.
 
         gr.Markdown(
             """
-### Originele tekst maken in de stijl van de trainingsteksten
-"""
+        # Originele tekst maken in de stijl van de trainingsteksten
+        """,
+            elem_id="originele-tekst-title",
         )
 
         document = gr.File(
