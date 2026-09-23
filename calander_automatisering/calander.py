@@ -1,71 +1,77 @@
-import pandas as pd
 from pathlib import Path
 
+from excel_normalizer import lees_evenementen
 
-def lees_evenementen(file_path):
-    """
-    Leest alle werkbladen uit het Excel-bestand
-    en haalt de gegevens per rij op.
 
-    Verwachte kolommen zijn ongeveer:
-    Week | Soort content | Post content | Dag | Activiteit | Kanaal
-    """
+EXCEL_FILE = Path(
+    r"C:\Bodie\marketing code"
+    r"\calander_automatisering"
+    r"\Jaarplanning social media 2026.xlsx"
+)
 
-    file_path = Path(file_path)
 
-    if not file_path.exists():
-        raise FileNotFoundError(
-            f"Excel-bestand niet gevonden: {file_path}"
+def print_evenementen(evenementen):
+    print("\n====================================")
+    print("EVENEMENTEN")
+    print("====================================")
+
+    if not evenementen:
+        print("Geen evenementen gevonden.")
+        return
+
+    for evenement in evenementen:
+
+        print(
+            "\n"
+            f"Week: {evenement.get('week')}\n"
+            f"Dag: {evenement.get('dag')}\n"
+            f"Activiteit: {evenement.get('activiteit')}\n"
+            f"Soort content: {evenement.get('soort_content')}\n"
+            f"Post content: {evenement.get('post_content')}\n"
+            f"Kanaal: {evenement.get('kanaal')}\n"
+            f"Bron: {evenement.get('bron')}"
         )
 
-    # Lees alle werkbladen
-    sheets = pd.read_excel(
-        file_path,
-        sheet_name=None,
-        engine="openpyxl"
-    )
 
-    evenementen = []
+def main():
+    try:
 
-    for sheet_name, df in sheets.items():
+        evenementen, fouten = lees_evenementen(
+            EXCEL_FILE
+        )
 
-        # Kolomnamen opschonen
-        df.columns = [
-            str(column).strip().lower()
-            for column in df.columns
-        ]
+        print(
+            f"\nAantal evenementen: "
+            f"{len(evenementen)}"
+        )
 
-        for _, row in df.iterrows():
+        print_evenementen(
+            evenementen
+        )
 
-            evenement = {
-                "week": row.get("week"),
-                "soort_content": row.get("soort content"),
-                "post_content": row.get("post content"),
-                "dag": row.get("dag"),
-                "activiteit": row.get("activiteit"),
-                "kanaal": row.get("kanaal"),
-                "bron": sheet_name,
-            }
+        if fouten:
 
-            # Alleen regels toevoegen waar daadwerkelijk
-            # een activiteit staat
-            if pd.notna(evenement["activiteit"]):
-                evenementen.append(evenement)
+            print("\n====================================")
+            print("NIET HERKENDE WERKBLADEN")
+            print("====================================")
 
-    return evenementen
+            for fout in fouten:
+
+                print(
+                    f"{fout['tabel']}: "
+                    f"{fout['fout']}"
+                )
+
+    except FileNotFoundError as error:
+        print(
+            f"Bestandsfout: {error}"
+        )
+
+    except Exception as error:
+        print(
+            f"Onverwachte fout: {error}"
+        )
 
 
 if __name__ == "__main__":
-
-    excel_file = (
-        r"C:\Bodie\marketing code\calander_automatisering"
-        r"\Jaarplanning social media 2026.xlsx"
-    )
-
-    evenementen = lees_evenementen(excel_file)
-
-    print(f"Aantal evenementen: {len(evenementen)}")
-
-    for evenement in evenementen:
-        print(evenement)
-        
+    main()
