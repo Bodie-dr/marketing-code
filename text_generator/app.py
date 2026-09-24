@@ -31,31 +31,74 @@ def initialize_database() -> None:
 
 logger = logging.getLogger(__name__)
 
-
 def laad_bedrijven():
     connection = None
 
     try:
         connection = create_connection()
         create_schema(connection)
+
+        # Bedrijven/projecten uit database ophalen
         bedrijven = get_project_names(connection)
+
+        # Als database nog leeg is:
+        # bedrijfsnamen automatisch uit DOCUMENTS_FOLDER halen
         if not bedrijven and DOCUMENTS_FOLDER.is_dir():
+            logger.info(
+                "Geen bedrijven in database gevonden. "
+                "Bedrijfsfolders worden geïmporteerd."
+            )
+
             for bedrijfsmap in sorted(DOCUMENTS_FOLDER.iterdir()):
                 if bedrijfsmap.is_dir():
-                    get_or_create_project(connection, bedrijfsmap.name)
+                    logger.info(
+                        "Bedrijf toevoegen: %s",
+                        bedrijfsmap.name,
+                    )
+
+                    get_or_create_project(
+                        connection,
+                        bedrijfsmap.name,
+                    )
+
             connection.commit()
+
+            # Opnieuw ophalen nadat bedrijven zijn toegevoegd
             bedrijven = get_project_names(connection)
-    except Exception:
-        logger.exception("Bedrijven konden niet uit de database worden geladen.")
-        bedrijven = []
+
+        # Voor de zekerheid alles naar strings converteren
+        bedrijven = [
+            str(bedrijf).strip()
+            for bedrijf in bedrijven
+            if bedrijf and str(bedrijf).strip()
+        ]
+
+        # Dubbele bedrijven verwijderen
+        bedrijven = list(dict.fromkeys(bedrijven))
+
+        logger.info(
+            "Bedrijven voor dropdown: %s",
+            bedrijven,
+        )
+
+        return gr.update(
+            choices=bedrijven,
+            value=bedrijven[0] if bedrijven else None,
+        )
+
+    except Exception as error:
+        logger.exception(
+            "Bedrijven konden niet worden geladen."
+        )
+
+        return gr.update(
+            choices=[],
+            value=None,
+        )
+
     finally:
         if connection is not None:
             connection.close()
-
-    return gr.Dropdown(
-        choices=bedrijven,
-        value=bedrijven[0] if bedrijven else None,
-    )
 
 
 def save_generated_word(text):
