@@ -3,6 +3,7 @@ import tempfile
 import os
 import sys
 from pathlib import Path
+from threading import Lock
 
 
 if __package__ in {None, ""}:
@@ -21,12 +22,21 @@ from document_repository import get_or_create_project, get_project_names
 from text_generation import generate_text
 
 
+_database_ready = False
+_database_lock = Lock()
+
+
 def initialize_database() -> None:
-    connection = create_connection()
-    try:
-        create_schema(connection)
-    finally:
-        connection.close()
+    global _database_ready
+    with _database_lock:
+        if _database_ready:
+            return
+        connection = create_connection()
+        try:
+            create_schema(connection)
+            _database_ready = True
+        finally:
+            connection.close()
 
 
 logger = logging.getLogger(__name__)
@@ -36,8 +46,8 @@ def laad_bedrijven():
     connection = None
 
     try:
+        initialize_database()
         connection = create_connection()
-        create_schema(connection)
         bedrijven = get_project_names(connection)
         if not bedrijven and DOCUMENTS_FOLDER.is_dir():
             for bedrijfsmap in sorted(DOCUMENTS_FOLDER.iterdir()):
@@ -125,12 +135,21 @@ def validate_and_generate(
             bedrijf=bedrijf or "",
             kanaal=kanaal or "LinkedIn",
         )
-        return resultaat, save_generated_word(resultaat)
     except Exception as error:
         raise gr.Error(
             "De factuurtekst kon niet worden gegenereerd. "
             "Controleer je API-configuratie en probeer opnieuw."
         ) from error
+
+    # Toon de tekst direct; Word-export mag de weergave niet ophouden.
+    yield resultaat, None
+    try:
+        bestand = save_generated_word(resultaat)
+    except Exception:
+        logger.exception("Word-document kon niet worden opgeslagen.")
+        gr.Warning("De tekst is klaar, maar het Word-document kon niet worden gemaakt.")
+        return
+    yield resultaat, bestand
 
 
 APP_THEME = gr.themes.Base(
@@ -591,7 +610,7 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 7860))
 
-    demo.launch(
+    demo.queue().launch(
         share=True,
         server_name="0.0.0.0",
         server_port=port,

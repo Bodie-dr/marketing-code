@@ -1,5 +1,6 @@
 ﻿import os
 from pathlib import Path
+from functools import lru_cache
 
 import numpy as np
 from dotenv import load_dotenv
@@ -12,6 +13,14 @@ from database import (
 from config import EMBEDDING_MODEL_NAME, PROJECT_NAME
 
 
+@lru_cache(maxsize=32)
+def _query_embedding(zoekopdracht: str):
+    """Hergebruik alleen de zoekvector; haal kennisbankinhoud altijd opnieuw op."""
+    from embedding_service import EmbeddingService
+
+    return EmbeddingService().create_embeddings([zoekopdracht])[0]
+
+
 def zoek_relevante_data(
     opdracht: str,
     bedrijf: str = "",
@@ -19,11 +28,8 @@ def zoek_relevante_data(
     aantal: int = 5,
 ) -> str:
     """Zoek de meest relevante opgeslagen documentchunks voor de opdracht."""
-    from embedding_service import EmbeddingService
-
-    embedding_service = EmbeddingService()
-    zoekopdracht = f"Bedrijf: {bedrijf}\nOpdracht: {opdracht}" if bedrijf else opdracht
-    query_embedding = embedding_service.create_embeddings([zoekopdracht])[0]
+    if aantal <= 0:
+        return ""
     project_name = bedrijf.strip() or PROJECT_NAME
     kanaal = kanaal.strip().casefold()
     if kanaal in {"linkedin", "instagram"}:
@@ -65,11 +71,17 @@ def zoek_relevante_data(
             resultaten = fetch_results(folder_pattern)
             if resultaten:
                 break
-        if not resultaten and folder_patterns:
+        if not resultaten:
             resultaten = fetch_results()
     finally:
         connection.close()
 
+    # Een lege kennisbank heeft geen zoekmodel of embedding nodig.
+    if not resultaten:
+        return ""
+
+    zoekopdracht = f"Bedrijf: {bedrijf}\nOpdracht: {opdracht}" if bedrijf else opdracht
+    query_embedding = _query_embedding(zoekopdracht)
     query_vector = np.asarray(query_embedding, dtype=np.float32)
     query_norm = np.linalg.norm(query_vector)
     scored_results = []
