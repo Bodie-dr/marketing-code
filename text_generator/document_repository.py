@@ -336,6 +336,43 @@ def insert_chunks_and_embeddings(
             )
 
 
+def deactivate_missing_documents(
+    connection: SQLiteConnection,
+    project_id: UUID,
+    present_relative_paths: set[str],
+) -> int:
+    """Zet documenten die niet meer in de map staan op inactief."""
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, relative_path
+            FROM documents
+            WHERE project_id = %s
+              AND is_active = TRUE
+            """,
+            (project_id,),
+        )
+        missing_ids = [
+            document_id
+            for document_id, relative_path in cursor.fetchall()
+            if relative_path not in present_relative_paths
+        ]
+
+        for document_id in missing_ids:
+            cursor.execute(
+                """
+                UPDATE documents
+                SET is_active = FALSE,
+                    updated_at = NOW()
+                WHERE id = %s
+                """,
+                (document_id,),
+            )
+
+    return len(missing_ids)
+
+
 def set_current_version(
     connection: SQLiteConnection,
     document_id: UUID,

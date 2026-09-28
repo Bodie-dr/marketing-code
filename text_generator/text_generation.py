@@ -1,4 +1,4 @@
-﻿import os
+import os
 from pathlib import Path
 from functools import lru_cache
 
@@ -6,7 +6,7 @@ import numpy as np
 from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
-load_dotenv(Path(__file__).with_name(".env"), override=True)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 from database import (
     create_connection,
 )
@@ -21,92 +21,139 @@ def _query_embedding(zoekopdracht: str):
     return EmbeddingService().create_embeddings([zoekopdracht])[0]
 
 
+# Submap per publicatiekanaal binnen elke bedrijfsmap.
+KANAAL_MAPPEN = {
+    "linkedin": "social_media_teksten",
+    "instagram": "social_media_teksten",
+    "website": "website_vacatuur_teksten",
+}
+
+# Maximale lengte van alle voorbeeldteksten samen in de prompt.
+MAX_VOORBEELD_TEKENS = 15000
+
+
+def _haal_documenten(connection, project_name=None, map_naam=None):
+    """Haal actieve Word-documenten op met de embeddings van hun chunks."""
+    query = """
+        SELECT d.id, p.name, d.relative_path, dv.full_text, e.embedding
+        FROM document_chunks AS dc
+        JOIN document_versions AS dv ON dv.id = dc.version_id
+        JOIN documents AS d ON d.id = dv.document_id
+        JOIN projects AS p ON p.id = d.project_id
+        JOIN embeddings AS e ON e.chunk_id = dc.id
+        WHERE d.is_active = TRUE
+          AND d.file_type = 'docx'
+          AND dv.version_number = d.current_version
+          AND e.model_name = %s
+    """
+    parameters = [EMBEDDING_MODEL_NAME]
+    if project_name:
+        query += " AND p.name = %s"
+        parameters.append(project_name)
+    if map_naam:
+        query += " AND lower(d.relative_path) LIKE lower(%s)"
+        parameters.append(f"{map_naam}/%")
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, parameters)
+        rows = cursor.fetchall()
+
+    documenten = {}
+    for document_id, bedrijfsnaam, pad, tekst, embedding in rows:
+        document = documenten.setdefault(
+            document_id,
+            {"bedrijf": bedrijfsnaam, "pad": pad, "tekst": tekst, "vectoren": []},
+        )
+        document["vectoren"].append(np.frombuffer(embedding, dtype=np.float32))
+    return list(documenten.values())
+
+
+def _gelijkenis(query_vector, vectoren) -> float:
+    """Hoogste cosinusgelijkenis tussen de zoekvraag en de chunks van een document."""
+    query_norm = np.linalg.norm(query_vector)
+    beste = -1.0
+    for vector in vectoren:
+        norm = np.linalg.norm(vector)
+        if query_norm and norm:
+            beste = max(beste, float(np.dot(query_vector, vector) / (query_norm * norm)))
+    return beste
+
+
 def zoek_relevante_data(
     opdracht: str,
     bedrijf: str = "",
     kanaal: str = "LinkedIn",
-    aantal: int = 5,
+    aantal: int = 3,
 ) -> str:
-    """Zoek de meest relevante opgeslagen documentchunks voor de opdracht."""
+    """Geef complete voorbeeldteksten uit de kennisbank terug.
+
+    Volledige teksten (in plaats van losse fragmenten) laten het model de
+    opbouw, lengte en tone of voice van echte publicaties overnemen. Teksten
+    van het gekozen bedrijf uit de map van het kanaal gaan voor; heeft het
+    bedrijf geen teksten, dan worden teksten van andere bedrijven voor
+    hetzelfde kanaal gebruikt als voorbeeld van de opbouw.
+    """
     if aantal <= 0:
         return ""
     project_name = bedrijf.strip() or PROJECT_NAME
-    kanaal = kanaal.strip().casefold()
-    if kanaal in {"linkedin", "instagram"}:
-        folder_patterns = ["%social_media_teksten%"]
-    elif kanaal == "website":
-        folder_patterns = [
-            "%website_vactuur_teksten%",
-            "%website_factuur_teksten%",
-        ]
-    else:
-        folder_patterns = []
+    kanaal_map = KANAAL_MAPPEN.get(kanaal.strip().casefold())
+
+    def in_kanaalmap(document):
+        return bool(kanaal_map) and document["pad"].casefold().startswith(
+            f"{kanaal_map}/".casefold()
+        )
 
     connection = create_connection()
-
     try:
-        def fetch_results(folder_filter=None):
-            with connection.cursor() as cursor:
-                query = """
-                    SELECT dc.content, e.embedding
-                    FROM document_chunks AS dc
-                    JOIN document_versions AS dv ON dv.id = dc.version_id
-                    JOIN documents AS d ON d.id = dv.document_id
-                    JOIN projects AS p ON p.id = d.project_id
-                    JOIN embeddings AS e ON e.chunk_id = dc.id
-                    WHERE p.name = %s
-                      AND d.is_active = TRUE
-                      AND dv.version_number = d.current_version
-                      AND e.model_name = %s
-                """
-                parameters = [project_name, EMBEDDING_MODEL_NAME]
-                if folder_filter:
-                    query += " AND lower(d.relative_path) LIKE lower(%s)"
-                    parameters.append(folder_filter)
-                cursor.execute(query, parameters)
-                return cursor.fetchall()
-
-        resultaten = []
-        for folder_pattern in folder_patterns:
-            resultaten = fetch_results(folder_pattern)
-            if resultaten:
-                break
-        if not resultaten:
-            resultaten = fetch_results()
+        documenten = _haal_documenten(connection, project_name=project_name)
+        if kanaal_map and not any(in_kanaalmap(document) for document in documenten):
+            documenten += [
+                document
+                for document in _haal_documenten(connection, map_naam=kanaal_map)
+                if document["bedrijf"] != project_name
+            ]
     finally:
         connection.close()
 
-    # Een lege kennisbank heeft geen zoekmodel of embedding nodig.
-    if not resultaten:
+    if not documenten:
         return ""
 
-    zoekopdracht = f"Bedrijf: {bedrijf}\nOpdracht: {opdracht}" if bedrijf else opdracht
-    query_embedding = _query_embedding(zoekopdracht)
-    query_vector = np.asarray(query_embedding, dtype=np.float32)
-    query_norm = np.linalg.norm(query_vector)
-    scored_results = []
+    # Het zoekmodel is alleen nodig als er meer kandidaten zijn dan plekken.
+    if len(documenten) > aantal:
+        zoekopdracht = f"Bedrijf: {bedrijf}\nOpdracht: {opdracht}" if bedrijf else opdracht
+        query_vector = np.asarray(_query_embedding(zoekopdracht), dtype=np.float32)
+        for document in documenten:
+            document["score"] = _gelijkenis(query_vector, document["vectoren"])
+    documenten.sort(
+        key=lambda document: (not in_kanaalmap(document), -document.get("score", 0.0))
+    )
 
-    for content, embedding_bytes in resultaten:
-        stored_vector = np.frombuffer(
-            embedding_bytes,
-            dtype=np.float32,
+    blokken = []
+    resterend = MAX_VOORBEELD_TEKENS
+    for nummer, document in enumerate(documenten[:aantal], start=1):
+        if resterend <= 0:
+            break
+        herkomst = (
+            "" if document["bedrijf"] == project_name
+            else " (ander bedrijf, alleen voor de opbouw)"
         )
-        stored_norm = np.linalg.norm(stored_vector)
+        tekst = document["tekst"][:resterend]
+        resterend -= len(tekst)
+        blokken.append(
+            f"### Voorbeeld {nummer}: {document['bedrijf']} - {document['pad']}{herkomst}\n\n{tekst}"
+        )
+    return "\n\n".join(blokken)
 
-        if query_norm == 0 or stored_norm == 0:
-            distance = float("inf")
-        else:
-            similarity = np.dot(query_vector, stored_vector) / (
-                query_norm * stored_norm
-            )
-            distance = 1 - float(similarity)
 
-        scored_results.append((distance, content))
-
-    scored_results.sort(key=lambda result: result[0])
-    return "\n\n---\n\n".join(
-        content
-        for _, content in scored_results[:aantal]
+@lru_cache(maxsize=4)
+def _openai_client(api_key: str, endpoint: str, api_version: str):
+    """Hergebruik de client, zodat de HTTPS-verbinding open blijft tussen aanvragen."""
+    if endpoint.endswith("/openai/v1"):
+        return OpenAI(api_key=api_key, base_url=f"{endpoint}/")
+    return AzureOpenAI(
+        api_key=api_key,
+        azure_endpoint=endpoint,
+        api_version=api_version,
     )
 
 
@@ -197,22 +244,11 @@ def genereer_factuurtekst(
             "AZURE_OPENAI_DEPLOYMENT in."
         )
 
-    endpoint = endpoint.strip().rstrip("/")
-
-    if endpoint.endswith("/openai/v1"):
-        client = OpenAI(
-            api_key=api_key.strip(),
-            base_url=f"{endpoint}/",
-        )
-    else:
-        client = AzureOpenAI(
-            api_key=api_key.strip(),
-            azure_endpoint=endpoint,
-            api_version=os.getenv(
-                "AZURE_OPENAI_API_VERSION",
-                "2024-10-21",
-            ),
-        )
+    client = _openai_client(
+        api_key.strip(),
+        endpoint.strip().rstrip("/"),
+        os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+    )
 
     documenttekst = lees_document(document) or style_text.strip()
     opgeslagen_data = zoek_relevante_data(
@@ -220,9 +256,7 @@ def genereer_factuurtekst(
         bedrijf,
         kanaal,
     )
-    extra_instructie = prompt.strip() or (
-        "Volg de stijl en structuur uit het document of de stijltekst."
-    )
+    extra_instructie = prompt.strip() or "Geen."
     aanleiding = aanleiding.strip() or "Niet opgegeven"
     insteek = insteek.strip() or "Niet opgegeven"
     doelgroep = doelgroep.strip() or "Niet opgegeven"
@@ -231,61 +265,59 @@ def genereer_factuurtekst(
 
     if modus == "Tekst herschrijven":
         taak_instructie = """
-Herschrijf de oorspronkelijke tekst hieronder. Behoud de feitelijke inhoud,
-maar verbeter duidelijkheid, structuur, spelling en stijl. Maak de tekst
-geschikt voor het gekozen publicatiekanaal. Voeg geen nieuwe feiten toe.
-Geef alleen de herschreven tekst terug.
+Herschrijf de ORIGINELE TEKST hieronder in de stijl van de voorbeeldteksten.
+Behoud de feitelijke inhoud en voeg geen nieuwe feiten toe.
 """
     else:
         taak_instructie = """
-Maak een volledig originele tekst. Gebruik de ingevoerde tekst alleen als
-achtergrond en inspiratie voor het onderwerp; kopieer of herschrijf die tekst
-niet letterlijk en neem geen bronopdracht over in je antwoord.
-
-- Gebruik de stijl, structuur, formaliteit, het detailniveau en de vaktermen
-    uit de trainingsvoorbeelden en het document.
-- Verzin geen feiten, namen of aantallen die niet in de achtergrondinformatie
-    of uitgangspunten staan.
-- Geef alleen de nieuwe tekst terug.
+Schrijf een nieuwe tekst over de opdracht hieronder. Gebruik de ORIGINELE
+TEKST (als die er is) alleen als inhoudelijke achtergrond.
 """
 
+    if opgeslagen_data:
+        voorbeelden = f"""
+Hieronder staan echte, eerder gepubliceerde teksten. Dit is je belangrijkste
+bron: de nieuwe tekst moet klinken alsof dezelfde schrijver hem heeft gemaakt.
+Neem daaruit over:
+- de tone of voice en aanspreekvorm (je/jij of u);
+- de opbouw: openingszin, volgorde van onderdelen, tussenkopjes, opsommingen
+  en de afsluiter met call-to-action;
+- de lengte, zinslengte en typische formuleringen en vaktermen.
+Neem GEEN feiten over die bij een ander onderwerp horen, zoals namen,
+functies, projecten, salarissen of aantallen.
+
+=== VOORBEELDTEKSTEN ===
+{opgeslagen_data}
+=== EINDE VOORBEELDTEKSTEN ===
+"""
+    else:
+        voorbeelden = (
+            "Er zijn geen voorbeeldteksten van dit bedrijf in de kennisbank. "
+            "Schrijf in een heldere, persoonlijke toon."
+        )
+
+    originele_tekst = (
+        f"=== ORIGINELE TEKST ===\n{documenttekst}\n=== EINDE ORIGINELE TEKST ==="
+        if documenttekst
+        else ""
+    )
+
     model_prompt = f"""
-Je schrijft teksten voor een aannemersbedrijf in de bouw.
+{voorbeelden}
 
-Gebruik de trainingsvoorbeelden en het geuploade document of de stijltekst als
-belangrijkste bron voor schrijfstijl, structuur, formele toon, vaktermen en de
-manier waarop werkzaamheden worden beschreven.
+{originele_tekst}
 
-OPGESLAGEN DATA UIT DE KENNISBANK:
---------------------
-{opgeslagen_data or "Geen relevante opgeslagen data gevonden."}
---------------------
-
-EXTRA DOCUMENT:
---------------------
-{documenttekst or "Geen extra document geupload."}
---------------------
-
-Extra instructie van de gebruiker:
-{extra_instructie}
-
-Inhoudelijke uitgangspunten:
+OPDRACHT
+- Bedrijf: {bedrijf}
+- Publicatiekanaal: {kanaal}
 - Aanleiding: {aanleiding}
 - Insteek: {insteek}
 - Doelgroep: {doelgroep}
-- Bedrijf: {bedrijf}
-- Publicatiekanaal: {kanaal}
-
-Zoek in de opgeslagen data en het extra document naar de tone of voice en
-kernwaarden van het genoemde bedrijf. Pas die toe op de tekst en stem de
-vorm, lengte en stijl af op het publicatiekanaal.
+- Extra instructie: {extra_instructie}
 
 {taak_instructie}
-
-Geef alleen de gegenereerde tekst terug.
-
-Achtergrondinformatie voor de nieuwe tekst:
-{nieuwe_opdracht}
+Verzin geen feiten, namen of aantallen die niet in de opdracht of de originele
+tekst staan. Geef alleen de tekst terug, zonder toelichting.
 """
 
     response = client.chat.completions.create(
@@ -294,8 +326,11 @@ Achtergrondinformatie voor de nieuwe tekst:
             {
                 "role": "system",
                 "content": (
-                    "Je bent een specialist in het schrijven "
-                    "van factuurteksten voor aannemersbedrijven."
+                    "Je bent de vaste copywriter van de bedrijven binnen "
+                    "Technische Verenigde Bedrijven (TVB). Je schrijft "
+                    "vacatureteksten en medewerkersverhalen voor website en "
+                    "social media, precies in de stijl van de bestaande "
+                    "teksten van het bedrijf."
                 ),
             },
             {

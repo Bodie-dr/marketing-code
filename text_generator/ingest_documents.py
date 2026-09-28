@@ -25,6 +25,7 @@ from document_repository import (
     checksum_exists,
     create_document,
     create_document_version,
+    deactivate_missing_documents,
     get_document,
     get_or_create_project,
     insert_chunks_and_embeddings,
@@ -270,6 +271,12 @@ def ingest_all_documents(
 
     statistics.found = len(files)
 
+    for shortcut in sorted(folder.rglob("*.docx.url")):
+        logger.warning(
+            "Snelkoppeling overgeslagen (download het echte Word-bestand): %s",
+            shortcut.relative_to(folder),
+        )
+
     if not files:
         logger.warning(
             "Geen ondersteunde documenten of afbeeldingen gevonden in %s",
@@ -356,6 +363,24 @@ def ingest_all_documents(
                     error,
                 )
 
+        if not preview:
+            present_paths = {
+                file_path.resolve().relative_to(folder.resolve()).as_posix()
+                for file_path in files
+            }
+            deactivated = deactivate_missing_documents(
+                connection,
+                project_id,
+                present_paths,
+            )
+            connection.commit()
+            if deactivated:
+                logger.info(
+                    "%s verouderde document(en) gedeactiveerd voor '%s'.",
+                    deactivated,
+                    project_name,
+                )
+
     finally:
         if connection is not None:
             connection.close()
@@ -390,6 +415,23 @@ def ingest_document_root(
     subfolders = sorted(
         path for path in folder.iterdir() if path.is_dir()
     )
+
+    # Hetzelfde bestand in meerdere bedrijfsmappen vertroebelt de tone of voice.
+    companies_per_checksum: dict[str, set[str]] = {}
+    for subfolder in subfolders:
+        for file_path in find_documents(subfolder):
+            if file_path.suffix.lower() == ".docx":
+                companies_per_checksum.setdefault(
+                    calculate_sha256(file_path), set()
+                ).add(f"{subfolder.name}/{file_path.name}")
+    for locations in companies_per_checksum.values():
+        if len(locations) > 1:
+            logger.warning(
+                "Identiek document in %s bedrijfsmappen (hoort waarschijnlijk "
+                "bij één bedrijf): %s",
+                len(locations),
+                ", ".join(sorted(locations)),
+            )
 
     if root_files:
         add_statistics(

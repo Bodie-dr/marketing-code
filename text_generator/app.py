@@ -3,7 +3,7 @@ import tempfile
 import os
 import sys
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Thread
 
 
 if __package__ in {None, ""}:
@@ -42,6 +42,16 @@ def initialize_database() -> None:
 logger = logging.getLogger(__name__)
 
 
+def warm_up_embedding_model() -> None:
+    """Laad het embeddingmodel (±13 s) op de achtergrond, niet bij de eerste klik."""
+    try:
+        from embedding_service import EmbeddingService
+
+        EmbeddingService()
+    except Exception:
+        logger.exception("Embeddingmodel kon niet vooraf worden geladen.")
+
+
 def laad_bedrijven():
     connection = None
 
@@ -72,8 +82,8 @@ def save_generated_word(text):
     if not text or not text.strip():
         return None
 
-    output_dir = Path(__file__).resolve().parent / "outputs"
-    output_dir.mkdir(exist_ok=True)
+    output_dir = Path(__file__).resolve().parent.parent / "outputs" / "word"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     with tempfile.NamedTemporaryFile(
         suffix=".docx",
@@ -94,6 +104,15 @@ def save_generated_word(text):
     document.save(bestand_path)
     return str(bestand_path)
 
+def update_modus_from_text(style_text):
+    """
+    Selecteer automatisch 'Tekst herschrijven' wanneer de gebruiker
+    eigen tekst invoert. Als het veld leeg is, selecteer 'Nieuwe tekst genereren'.
+    """
+    if style_text and style_text.strip():
+        return "Tekst herschrijven"
+
+    return "Nieuwe tekst genereren"
 
 def validate_and_generate(
     document,
@@ -135,6 +154,7 @@ def validate_and_generate(
             bedrijf=bedrijf or "",
             kanaal=kanaal or "LinkedIn",
         )
+    
     except Exception as error:
         raise gr.Error(
             "De factuurtekst kon niet worden gegenereerd. "
@@ -488,6 +508,7 @@ with gr.Blocks(
             value="Nieuwe tekst genereren",
             label="Functie",
         )
+        
 
         tekst_prompt = gr.Textbox(
             label="Tekstbewerking",
@@ -563,6 +584,12 @@ with gr.Blocks(
             outputs=[factuur_resultaat, download_file],
         )
 
+        style_text.change(
+            fn=update_modus_from_text,
+            inputs=style_text,
+            outputs=modus,
+        )
+
         wis_button.click(
             fn=lambda: (
                 None,
@@ -607,6 +634,7 @@ with gr.Blocks(
 
 if __name__ == "__main__":
     initialize_database()
+    Thread(target=warm_up_embedding_model, daemon=True).start()
 
     port = int(os.environ.get("PORT", 7860))
 

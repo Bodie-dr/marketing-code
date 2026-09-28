@@ -31,31 +31,57 @@ class PerformanceTests(unittest.TestCase):
             embed.assert_not_called()
             connection.close.assert_called_once()
 
+    @staticmethod
+    def row(doc_id, pad, tekst, vector, bedrijf="Klik"):
+        return (doc_id, bedrijf, pad, tekst, np.array(vector, dtype=np.float32).tobytes())
+
     def test_repeated_query_reuses_embedding_but_refreshes_documents(self):
-        vector = np.array([1, 0], dtype=np.float32)
         connection = self.connection([
-            [("Oude inhoud", vector.tobytes())],
-            [("Nieuwe inhoud", vector.tobytes())],
+            [self.row("a", "social_media_teksten/x.docx", "Oude inhoud", [1, 0]),
+             self.row("b", "social_media_teksten/y.docx", "Andere", [0, 1])],
+            [self.row("a", "social_media_teksten/x.docx", "Nieuwe inhoud", [1, 0]),
+             self.row("b", "social_media_teksten/y.docx", "Andere", [0, 1])],
         ])
         service = MagicMock()
-        service.return_value.create_embeddings.return_value = [vector]
+        service.return_value.create_embeddings.return_value = [np.array([1, 0], dtype=np.float32)]
         with patch.object(generation, "create_connection", return_value=connection), patch.dict(
             sys.modules, {"embedding_service": SimpleNamespace(EmbeddingService=service)}
         ):
-            self.assertEqual(generation.zoek_relevante_data("opdracht"), "Oude inhoud")
-            self.assertEqual(generation.zoek_relevante_data("opdracht"), "Nieuwe inhoud")
+            self.assertIn("Oude inhoud", generation.zoek_relevante_data("opdracht", "Klik", aantal=1))
+            self.assertIn("Nieuwe inhoud", generation.zoek_relevante_data("opdracht", "Klik", aantal=1))
             service.return_value.create_embeddings.assert_called_once()
 
-    def test_fallback_and_ranking(self):
+    def test_channel_folder_first_then_similarity(self):
         rows = [
-            ("Minder relevant", np.array([0, 1], dtype=np.float32).tobytes()),
-            ("Relevant", np.array([1, 0], dtype=np.float32).tobytes()),
+            self.row("a", "social_media_teksten/verhaal.docx", "Social", [1, 0]),
+            self.row("b", "website_vacatuur_teksten/minder.docx", "Minder relevant", [0, 1]),
+            self.row("c", "website_vacatuur_teksten/beter.docx", "Relevant", [1, 0]),
         ]
-        for channel, results in [("Website", [[], [], rows]), ("Overig", [rows])]:
-            with self.subTest(channel=channel), patch.object(
-                generation, "create_connection", return_value=self.connection(results)
-            ), patch.object(generation, "_query_embedding", return_value=[1, 0]):
-                self.assertEqual(generation.zoek_relevante_data("opdracht", kanaal=channel, aantal=1), "Relevant")
+        with patch.object(generation, "create_connection", return_value=self.connection([rows])), patch.object(
+            generation, "_query_embedding", return_value=[1, 0]
+        ):
+            resultaat = generation.zoek_relevante_data("opdracht", "Klik", kanaal="Website", aantal=2)
+        self.assertLess(resultaat.index("Relevant"), resultaat.index("Minder relevant"))
+        self.assertNotIn("Social", resultaat)
+
+    def test_full_document_text_is_returned(self):
+        tekst = "Opening.\n\nWat ga je doen?\n- Taak\n\nSolliciteer direct!"
+        rows = [self.row("a", "website_vacatuur_teksten/v.docx", tekst, [1, 0])] * 2
+        with patch.object(generation, "create_connection", return_value=self.connection([rows])):
+            self.assertIn(tekst, generation.zoek_relevante_data("opdracht", "Klik", kanaal="Website"))
+
+    def test_other_companies_used_when_company_has_no_texts(self):
+        rows = [self.row("a", "social_media_teksten/v.docx", "Verhaal", [1, 0], bedrijf="STB")]
+        eigen = [self.row("b", "website_vacatuur_teksten/vac.docx", "Eigen vacature", [1, 0])]
+        for eigen_rows in ([], eigen):
+            with self.subTest(eigen=bool(eigen_rows)), patch.object(
+                generation, "create_connection", return_value=self.connection([eigen_rows, rows])
+            ):
+                resultaat = generation.zoek_relevante_data("opdracht", "Klik", kanaal="LinkedIn")
+            self.assertIn("Verhaal", resultaat)
+            self.assertIn("ander bedrijf", resultaat)
+            if eigen_rows:
+                self.assertIn("Eigen vacature", resultaat)
 
     def test_text_is_visible_before_word_export(self):
         with patch.object(app, "generate_text", return_value="Resultaat"), patch.object(

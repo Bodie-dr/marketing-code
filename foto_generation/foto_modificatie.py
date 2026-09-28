@@ -1,5 +1,10 @@
 import os
+from pathlib import Path
+
 import requests
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 CLAID_API_KEY = os.getenv("CLAID_API_KEY")
 

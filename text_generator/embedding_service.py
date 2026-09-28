@@ -1,4 +1,6 @@
-﻿import numpy as np
+﻿from threading import Lock
+
+import numpy as np
 
 from config import (
     EMBEDDING_MODEL_NAME,
@@ -8,18 +10,21 @@ from config import (
 
 class EmbeddingService:
     _model = None
+    # Voorkomt dat de achtergrond-opwarming en een aanvraag het model dubbel laden.
+    _model_lock = Lock()
 
     def __init__(self) -> None:
-        from sentence_transformers import SentenceTransformer
+        with EmbeddingService._model_lock:
+            if EmbeddingService._model is None:
+                from sentence_transformers import SentenceTransformer
 
-        if EmbeddingService._model is None:
-            print(
-                "Embeddingmodel laden:",
-                EMBEDDING_MODEL_NAME,
-            )
-            EmbeddingService._model = SentenceTransformer(
-                EMBEDDING_MODEL_NAME
-            )
+                print(
+                    "Embeddingmodel laden:",
+                    EMBEDDING_MODEL_NAME,
+                )
+                EmbeddingService._model = SentenceTransformer(
+                    EMBEDDING_MODEL_NAME
+                )
 
         self.model = EmbeddingService._model
 

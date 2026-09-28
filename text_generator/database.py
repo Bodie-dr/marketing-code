@@ -13,7 +13,7 @@ from config import DATABASE_PATH
 
 logger = logging.getLogger(__name__)
 
-load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 def _adapt_value(value: Any) -> Any:

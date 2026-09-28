@@ -7,10 +7,9 @@ from excel_normalizer import lees_evenementen
 # INSTELLINGEN
 # ============================================================
 
-EXCEL_FILE = Path(
-    r"C:\Bodie\marketing code"
-    r"\calander_automatisering"
-    r"\Jaarplanning social media 2026.xlsx"
+EXCEL_FILE = (
+    Path(__file__).resolve().parent
+    / "Jaarplanning social media 2026.xlsx"
 )
 
 

@@ -1,0 +1,12 @@
+# Alle onderdelen van het project in één keer installeren:
+#   pip install -r requirements.txt
+
+# Tekstgenerator (Gradio-app)
+-r text_generator/requirements.txt
+
+# Foto-generatie (Claid / Pixelcut)
+requests
+
+# Kalender-automatisering (Excel inlezen)
+pandas
+openpyxl
