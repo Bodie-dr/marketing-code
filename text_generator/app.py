@@ -192,13 +192,13 @@ APP_CSS = """
     --tvb-secondary: #B8C4D2;
     --tvb-white: #FFFFFF;
 }
-/* Tekst boven en rondom invoervelden wit maken */
+/* Veldnamen staan op witte kaarten, dus donker maken */
 .gradio-container label,
 .gradio-container label span,
 .gradio-container .label-wrap,
 .gradio-container .info,
 .gradio-container p {
-    color: #FFFFFF !important;
+    color: #222D4F !important;
 }
 
 /* Markdown tekst op de donkerblauwe achtergrond */
@@ -302,9 +302,29 @@ button[variant="secondary"]:hover {
     background: var(--tvb-green-dark) !important;
 }
 
-/* Radio buttons */
+/* Radio buttons: de gekozen optie duidelijk groen markeren */
 input[type="radio"] {
     accent-color: var(--tvb-green) !important;
+}
+
+.gradio-container label:has(> input[type="radio"]) {
+    background: var(--tvb-light) !important;
+    border: 2px solid var(--tvb-secondary) !important;
+    border-radius: 10px !important;
+    padding: 8px 14px !important;
+    cursor: pointer !important;
+}
+
+.gradio-container label:has(> input[type="radio"]:checked),
+.gradio-container label.selected:has(> input[type="radio"]) {
+    background: var(--tvb-green) !important;
+    border-color: var(--tvb-green-dark) !important;
+}
+
+.gradio-container label:has(> input[type="radio"]:checked) span,
+.gradio-container label.selected:has(> input[type="radio"]) span {
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
 }
 
 /* Upload component */
@@ -313,8 +333,8 @@ input[type="radio"] {
     border-radius: 12px !important;
 }
 
-/* Inputs */
-input,
+/* Inputs (niet de rondjes van radio buttons, anders verdwijnt de selectie) */
+input:not([type="radio"]):not([type="checkbox"]),
 textarea,
 select {
     border: 2px solid var(--tvb-secondary) !important;
