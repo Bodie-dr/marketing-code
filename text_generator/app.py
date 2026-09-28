@@ -104,11 +104,15 @@ def save_generated_word(text):
     document.save(bestand_path)
     return str(bestand_path)
 
-def update_modus_from_text(style_text):
+def update_modus_from_text(style_text, handmatig_gekozen=False):
     """
     Selecteer automatisch 'Tekst herschrijven' wanneer de gebruiker
     eigen tekst invoert. Als het veld leeg is, selecteer 'Nieuwe tekst genereren'.
+    Heeft de gebruiker zelf een functie gekozen, dan blijft die keuze staan.
     """
+    if handmatig_gekozen:
+        return gr.update()
+
     if style_text and style_text.strip():
         return "Tekst herschrijven"
 
@@ -508,7 +512,9 @@ with gr.Blocks(
             value="Nieuwe tekst genereren",
             label="Functie",
         )
-        
+
+        # Onthoudt of de gebruiker zelf een functie heeft aangeklikt.
+        modus_handmatig = gr.State(False)
 
         tekst_prompt = gr.Textbox(
             label="Tekstbewerking",
@@ -584,9 +590,17 @@ with gr.Blocks(
             outputs=[factuur_resultaat, download_file],
         )
 
-        style_text.change(
+        # .input reageert alleen op de gebruiker zelf, niet op waarden die de
+        # app zet (zoals bij wissen); zo overschrijft niets de gekozen functie.
+        modus.input(
+            fn=lambda: True,
+            inputs=[],
+            outputs=modus_handmatig,
+        )
+
+        style_text.input(
             fn=update_modus_from_text,
-            inputs=style_text,
+            inputs=[style_text, modus_handmatig],
             outputs=modus,
         )
 
@@ -602,6 +616,7 @@ with gr.Blocks(
                 None,
                 "LinkedIn",
                 None,
+                False,
             ),
             inputs=[],
             outputs=[
@@ -615,6 +630,7 @@ with gr.Blocks(
                 bedrijf,
                 kanaal,
                 download_file,
+                modus_handmatig,
             ],
         )
 

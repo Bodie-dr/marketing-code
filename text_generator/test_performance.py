@@ -101,6 +101,12 @@ class PerformanceTests(unittest.TestCase):
             self.assertEqual(list(updates), [("Resultaat", None)])
             warning.assert_called_once()
 
+    def test_manual_modus_choice_is_kept(self):
+        self.assertEqual(app.update_modus_from_text("Tekst"), "Tekst herschrijven")
+        self.assertEqual(app.update_modus_from_text(""), "Nieuwe tekst genereren")
+        self.assertEqual(app.update_modus_from_text("Tekst", True), app.gr.update())
+        self.assertEqual(app.update_modus_from_text("", True), app.gr.update())
+
     def test_schema_created_once(self):
         with patch.object(app, "_database_ready", False), patch.object(app, "create_connection"), patch.object(
             app, "create_schema"
