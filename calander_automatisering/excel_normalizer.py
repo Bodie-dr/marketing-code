@@ -1,7 +1,11 @@
+import logging
 import re
 from pathlib import Path
 
 import pandas as pd
+
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -113,16 +117,19 @@ def clean_week(value):
 
     value = str(value).strip()
 
-    match = re.search(
-        r"\d{1,2}",
-        value
+    # Alleen een weeknotatie als geheel accepteren, zodat kopregels zoals
+    # "Start Q1 2026 (1 jan t/m 31 maart)" geen nep-week 1 opleveren.
+    match = re.fullmatch(
+        r"(?:week|wk)?\s*(?:nr\.?|nummer)?\s*(\d{1,2})(?:\.0)?",
+        value,
+        flags=re.IGNORECASE,
     )
 
     if match is None:
         return pd.NA
 
     week = int(
-        match.group()
+        match.group(1)
     )
 
     if 1 <= week <= 53:
@@ -326,24 +333,11 @@ def normalize_sheet(
         df.columns
     )
 
-    print()
-    print("=" * 60)
-
-    print(
-        f"WERKBLAD: {sheet_name}"
+    logger.debug(
+        "Werkblad '%s', kolommen: %s",
+        sheet_name,
+        list(df.columns),
     )
-
-    print("=" * 60)
-
-    print(
-        "\nOriginele kolommen:"
-    )
-
-    for column in df.columns:
-
-        print(
-            f"  - {column}"
-        )
 
     # --------------------------------------------------------
     # Geen week gevonden
@@ -357,9 +351,10 @@ def normalize_sheet(
             f"Kolommen: {list(df.columns)}"
         )
 
-    print(
-        f"\nWeekkolom gevonden: "
-        f"{week_column}"
+    logger.debug(
+        "Werkblad '%s', weekkolom: %s",
+        sheet_name,
+        week_column,
     )
 
     # ========================================================
@@ -457,16 +452,18 @@ def normalize_sheet(
         - rows_after
     )
 
-    print(
-        f"Geldige regels: "
-        f"{rows_after}"
+    logger.info(
+        "Werkblad '%s': %s geldige regels",
+        sheet_name,
+        rows_after,
     )
 
     if removed_rows > 0:
 
-        print(
-            f"Overgeslagen regels zonder "
-            f"weeknummer: {removed_rows}"
+        logger.info(
+            "Werkblad '%s': %s regels zonder weeknummer overgeslagen",
+            sheet_name,
+            removed_rows,
         )
 
     return (
@@ -516,15 +513,10 @@ def lees_evenementen(
         engine="openpyxl"
     )
 
-    print()
-    print(
-        f"Excel geladen: "
-        f"{file_path.name}"
-    )
-
-    print(
-        f"Aantal werkbladen: "
-        f"{len(sheets)}"
+    logger.info(
+        "Excel geladen: %s (%s werkbladen)",
+        file_path.name,
+        len(sheets),
     )
 
     normalized_sheets = []

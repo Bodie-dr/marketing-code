@@ -6,13 +6,21 @@ from pathlib import Path
 from threading import Lock, Thread
 
 
-if __package__ in {None, ""}:
-    sys.path.insert(
-        0,
-        str(Path(__file__).resolve().parent.parent),
-    )
+APP_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = APP_DIR.parent
+CALENDAR_DIR = PROJECT_DIR / "calander_automatisering"
+
+# Eigen map vooraan, zodat `database`, `config` enz. altijd uit text_generator
+# komen, ook als de app vanuit de projectmap wordt gestart. De kalendermap
+# achteraan voor het tabblad Weekplanning.
+if str(APP_DIR) in sys.path:
+    sys.path.remove(str(APP_DIR))
+sys.path.insert(0, str(APP_DIR))
+if str(CALENDAR_DIR) not in sys.path:
+    sys.path.append(str(CALENDAR_DIR))
 
 import gradio as gr
+from gradio.themes import Base, LocalFont
 from docx import Document
 from docx.shared import Inches
 from database import create_connection, create_schema
@@ -101,8 +109,98 @@ def save_generated_word(text):
 
     for regel in text.strip().splitlines():
         document.add_paragraph(regel)
-    document.save(bestand_path)
+    document.save(str(bestand_path))
     return str(bestand_path)
+
+def _planning_posts():
+    """Lees de jaarplanning opnieuw in, zodat wijzigingen in Excel direct zichtbaar zijn."""
+    from planning_posts import lees_posts, standaard_excel_bestand
+
+    posts, _ = lees_posts(standaard_excel_bestand())
+    return posts
+
+
+def _posts_in_week(maandag_iso, bedrijf=None):
+    from datetime import date
+
+    from weekplanning import filter_bedrijf, posts_in_periode
+
+    if not maandag_iso:
+        return []
+    posts = filter_bedrijf(_planning_posts(), bedrijf)
+    return posts_in_periode(posts, date.fromisoformat(maandag_iso), 1)
+
+
+def laad_planning_keuzes(huidig_bedrijf=None):
+    """Vul de keuzelijsten voor week en bedrijf; een gekozen bedrijf blijft staan."""
+    try:
+        posts = _planning_posts()
+        from weekplanning import (
+            ALLE_BEDRIJVEN,
+            bedrijven_in_planning,
+            standaard_week,
+            weken_in_planning,
+        )
+    except Exception:
+        logger.exception("Jaarplanning kon niet worden geladen.")
+        gr.Warning("De jaarplanning kon niet worden geladen. Controleer CALENDAR_EXCEL_FILE in .env.")
+        return gr.Dropdown(choices=[], value=None), gr.Dropdown(choices=[], value=None)
+
+    bedrijven = [ALLE_BEDRIJVEN, *bedrijven_in_planning(posts)]
+    bedrijf = huidig_bedrijf if huidig_bedrijf in bedrijven else ALLE_BEDRIJVEN
+    return (
+        gr.Dropdown(choices=weken_in_planning(posts), value=standaard_week(posts)),
+        gr.Dropdown(choices=bedrijven, value=bedrijf),
+    )
+
+
+def toon_planning_week(maandag_iso, bedrijf=None):
+    from weekplanning import posts_tabel
+
+    return posts_tabel(_posts_in_week(maandag_iso, bedrijf))
+
+
+def maak_planning_concepten(maandag_iso, bedrijf, opnieuw, progress=gr.Progress()):
+    from concepten import maak_concepten
+
+    posts = _posts_in_week(maandag_iso, bedrijf)
+    if not posts:
+        raise gr.Error("Er zijn geen posts gepland in deze week voor deze selectie.")
+
+    resultaten = maak_concepten(
+        posts,
+        opnieuw=bool(opnieuw),
+        voortgang=lambda nummer, totaal, post: progress(
+            (nummer - 1) / totaal,
+            desc=f"{nummer}/{totaal}: {post.bedrijf} – {post.kanaal}",
+        ),
+    )
+
+    aantallen = {
+        status: sum(resultaat.status == status for resultaat in resultaten)
+        for status in ["gemaakt", "bestond al", "mislukt"]
+    }
+    status = (
+        f"{aantallen['gemaakt']} gemaakt, {aantallen['bestond al']} bestonden al, "
+        f"{aantallen['mislukt']} mislukt. Map: {resultaten[0].pad.parent.parent}"
+    )
+    bestanden = [str(resultaat.pad) for resultaat in resultaten if resultaat.pad.exists()]
+    return bestanden, status
+
+
+def download_planning_excel(bedrijf=None):
+    from excel_export import schrijf_excel
+    from weekplanning import ALLE_BEDRIJVEN, filter_bedrijf
+
+    posts = filter_bedrijf(_planning_posts(), bedrijf)
+    if not posts:
+        raise gr.Error("Er zijn geen posts voor deze selectie.")
+
+    naam = "social_media_planning"
+    if bedrijf and bedrijf != ALLE_BEDRIJVEN:
+        naam += f" - {posts[0].bedrijf}"
+    return str(schrijf_excel(posts, PROJECT_DIR / "outputs" / "kalender" / f"{naam}.xlsx"))
+
 
 def update_modus_from_text(style_text, handmatig_gekozen=False):
     """
@@ -176,10 +274,19 @@ def validate_and_generate(
     yield resultaat, bestand
 
 
-APP_THEME = gr.themes.Base(
+APP_THEME = Base(
     primary_hue="cyan",
     secondary_hue="blue",
+    # Gradio kent alleen slate, gray, zinc, neutral en stone ("white" crasht).
     neutral_hue="slate",
+    # Standaard laadt Gradio alleen 400 en 600. Zonder 700 maakt de browser
+    # vette koppen zelf na, waardoor letters als de "a" vervormd raken.
+    font=[
+        LocalFont("IBM Plex Sans", weights=(400, 600, 700)),
+        "ui-sans-serif",
+        "system-ui",
+        "sans-serif",
+    ],
 )
 
 APP_CSS = """
@@ -232,7 +339,7 @@ APP_CSS = """
 h1 {
     color: var(--tvb-blue) !important;
     font-size: 3.5rem !important;
-    font-weight: 900 !important;
+    font-weight: 700 !important;
     text-align: center !important;
     border-bottom: 4px solid var(--tvb-green);
     padding-bottom: 10px;
@@ -253,15 +360,33 @@ h2,h3,h4,h5,h6 {
     box-shadow: 0 8px 25px rgba(34,45,79,0.15) !important;
 }
 
-/* Tabs */
-button.selected {
-    background: var(--tvb-blue) !important;
-    color: white !important;
-    border: 2px solid var(--tvb-green) !important;
+/* Tabs (paginakoppen): goed leesbaar op de donkerblauwe achtergrond */
+button[role="tab"] {
+    color: #FFFFFF !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 2px solid var(--tvb-secondary) !important;
+    border-radius: 10px 10px 0 0 !important;
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    padding: 10px 22px !important;
+    margin-right: 6px !important;
+    opacity: 1 !important;
 }
 
-button.selected:hover {
-    background: var(--tvb-blue-dark) !important;
+button[role="tab"]:hover {
+    background: rgba(255, 255, 255, 0.18) !important;
+}
+
+button[role="tab"].selected,
+button[role="tab"][aria-selected="true"] {
+    background: var(--tvb-green) !important;
+    border-color: var(--tvb-green) !important;
+    color: #FFFFFF !important;
+}
+
+/* Gradio zet onder het gekozen tabblad een streep; die hebben we niet nodig */
+button[role="tab"].selected::after {
+    display: none !important;
 }
 
 
@@ -437,7 +562,7 @@ gradio-app {
 #factuur-title h1 {
     color: #222D4F !important;
     font-size: 3rem !important;
-    font-weight: 900 !important;
+    font-weight: 700 !important;
     text-align: center !important;
     border-bottom: 4px solid #38B5A8 !important;
     padding-bottom: 12px !important;
@@ -480,14 +605,14 @@ gradio-app {
 #originele-tekst-title h2 {
     color: #222D4F !important;
     font-size: 1.55rem !important;
-    font-weight: 800 !important;
+    font-weight: 700 !important;
     margin: 0 !important;
     border: none !important;
 }
 """
 
 with gr.Blocks(
-    title="FotoModel & Factuurgenerator",
+    title="AI in marketing",
 ) as demo:
 
     # ==================================================
@@ -610,8 +735,7 @@ with gr.Blocks(
             outputs=[factuur_resultaat, download_file],
         )
 
-        # .input reageert alleen op de gebruiker zelf, niet op waarden die de
-        # app zet (zoals bij wissen); zo overschrijft niets de gekozen functie.
+
         modus.input(
             fn=lambda: True,
             inputs=[],
@@ -654,10 +778,116 @@ with gr.Blocks(
             ],
         )
 
+    # ==================================================
+    # TAB 2 - WEEKPLANNING
+    # ==================================================
+
+    with gr.Tab("Weekplanning"):
+
+        gr.Markdown(
+            """
+        # Weekplanning
+
+        Wat moet er deze week de deur uit? Maak in één keer Word-concepten
+        voor alle geplande posts, of download de planning als Excel.
+        """,
+            elem_id="factuur-title",
+        )
+
+        with gr.Row():
+            planning_week = gr.Dropdown(
+                label="Week",
+                choices=[],
+                scale=3,
+            )
+            planning_bedrijf = gr.Dropdown(
+                label="Bedrijf",
+                choices=[],
+                scale=2,
+            )
+            planning_vernieuwen = gr.Button(
+                "Planning vernieuwen",
+                variant="secondary",
+                scale=1,
+            )
+
+        planning_tabel = gr.Dataframe(
+            label="Geplande posts",
+            interactive=False,
+            wrap=True,
+        )
+
+        planning_opnieuw = gr.Checkbox(
+            label="Bestaande concepten opnieuw maken (kost extra API-aanroepen)",
+            value=False,
+        )
+
+        with gr.Row():
+            concepten_button = gr.Button(
+                "Concepten maken voor deze week",
+                variant="primary",
+            )
+            excel_button = gr.Button(
+                "Planning downloaden (Excel)",
+                variant="secondary",
+            )
+
+        planning_status = gr.Textbox(label="Status", interactive=False)
+
+        planning_bestanden = gr.File(
+            label="Concepten (Word)",
+            file_count="multiple",
+            interactive=False,
+        )
+
+        planning_excel = gr.File(
+            label="Planning als Excel (één regel per post, met filters)",
+            interactive=False,
+        )
+
+        for keuzelijst in (planning_week, planning_bedrijf):
+            keuzelijst.change(
+                fn=toon_planning_week,
+                inputs=[planning_week, planning_bedrijf],
+                outputs=planning_tabel,
+            )
+
+        planning_vernieuwen.click(
+            fn=laad_planning_keuzes,
+            inputs=planning_bedrijf,
+            outputs=[planning_week, planning_bedrijf],
+        ).then(
+            fn=toon_planning_week,
+            inputs=[planning_week, planning_bedrijf],
+            outputs=planning_tabel,
+        )
+
+        concepten_button.click(
+            fn=maak_planning_concepten,
+            inputs=[planning_week, planning_bedrijf, planning_opnieuw],
+            outputs=[planning_bestanden, planning_status],
+        )
+
+        excel_button.click(
+            fn=download_planning_excel,
+            inputs=planning_bedrijf,
+            outputs=planning_excel,
+        )
+
     demo.load(
         fn=laad_bedrijven,
         inputs=[],
         outputs=bedrijf,
+    )
+
+    demo.load(
+        fn=laad_planning_keuzes,
+        inputs=[],
+        outputs=[planning_week, planning_bedrijf],
+    ).then(
+        fn=toon_planning_week,
+        inputs=[planning_week, planning_bedrijf],
+        outputs=planning_tabel,
     )
 
     # ==================================================
@@ -680,5 +910,7 @@ if __name__ == "__main__":
         server_port=port,
         theme=APP_THEME,
         css=APP_CSS,
+        # Word-concepten en agenda staan in <project>/outputs.
+        allowed_paths=[str(PROJECT_DIR / "outputs")],
     )
 

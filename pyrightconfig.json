@@ -1,0 +1,18 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "exclude": ["**/__pycache__", ".venv", "_archief", "outputs", "**/build", "**/dist"],
+  "executionEnvironments": [
+    {
+      "root": "text_generator",
+      "extraPaths": ["calander_automatisering"]
+    },
+    {
+      "root": "calander_automatisering",
+      "extraPaths": ["text_generator"]
+    },
+    {
+      "root": "foto_generation"
+    }
+  ]
+}
