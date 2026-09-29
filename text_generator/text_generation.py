@@ -1,4 +1,6 @@
+import logging
 import os
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 from functools import lru_cache
 
@@ -11,6 +13,16 @@ from database import (
     create_connection,
 )
 from config import EMBEDDING_MODEL_NAME, PROJECT_NAME
+
+
+logger = logging.getLogger(__name__)
+
+# Na zoveel seconden zonder antwoord start een reservepoging (0 = uit).
+MODEL_RESERVE_NA = float(os.getenv("AZURE_OPENAI_RESERVE_NA", "8"))
+MODEL_MAX_POGINGEN = 3
+# Een aanvraag die nooit antwoordt mag de app niet eindeloos laten wachten.
+MODEL_TIMEOUT = 90
+_model_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="model")
 
 
 @lru_cache(maxsize=32)
@@ -149,12 +161,58 @@ def zoek_relevante_data(
 def _openai_client(api_key: str, endpoint: str, api_version: str):
     """Hergebruik de client, zodat de HTTPS-verbinding open blijft tussen aanvragen."""
     if endpoint.endswith("/openai/v1"):
-        return OpenAI(api_key=api_key, base_url=f"{endpoint}/")
+        return OpenAI(api_key=api_key, base_url=f"{endpoint}/", timeout=MODEL_TIMEOUT)
     return AzureOpenAI(
         api_key=api_key,
         azure_endpoint=endpoint,
         api_version=api_version,
+        timeout=MODEL_TIMEOUT,
     )
+
+
+def _vraag_model(maak_aanroep):
+    """Voer de modelaanroep uit met een reservepoging bij lange wachttijd.
+
+    Azure laat een aanvraag soms 15-30 s in de rij staan, terwijl dezelfde
+    aanvraag even later in een paar seconden klaar is. Komt er binnen
+    MODEL_RESERVE_NA seconden geen antwoord, dan start een identieke tweede
+    (en eventueel derde) aanvraag; het eerste antwoord wint. Alleen in dat
+    trage geval kost dit extra tokens. Zet AZURE_OPENAI_RESERVE_NA=0 om het
+    uit te zetten.
+    """
+    if MODEL_RESERVE_NA <= 0:
+        return maak_aanroep()
+
+    pogingen = [_model_executor.submit(maak_aanroep)]
+    lopend = set(pogingen)
+    laatste_fout = None
+
+    while lopend:
+        extra_mogelijk = len(pogingen) < MODEL_MAX_POGINGEN
+        klaar, lopend = wait(
+            lopend,
+            timeout=MODEL_RESERVE_NA if extra_mogelijk else None,
+            return_when=FIRST_COMPLETED,
+        )
+
+        for poging in klaar:
+            fout = poging.exception()
+            if fout is None:
+                return poging.result()
+            laatste_fout = fout
+
+        # Geen antwoord binnen de wachttijd, of alle lopende pogingen mislukt.
+        if extra_mogelijk and (not klaar or not lopend):
+            logger.info(
+                "Geen antwoord van het model na %ss; reservepoging %s gestart.",
+                MODEL_RESERVE_NA,
+                len(pogingen) + 1,
+            )
+            nieuwe_poging = _model_executor.submit(maak_aanroep)
+            pogingen.append(nieuwe_poging)
+            lopend.add(nieuwe_poging)
+
+    raise laatste_fout
 
 
 def lees_document(document):
@@ -320,7 +378,7 @@ Verzin geen feiten, namen of aantallen die niet in de opdracht of de originele
 tekst staan. Geef alleen de tekst terug, zonder toelichting.
 """
 
-    response = client.chat.completions.create(
+    response = _vraag_model(lambda: client.chat.completions.create(
         model=deployment.strip(),
         messages=[
             {
@@ -338,7 +396,7 @@ tekst staan. Geef alleen de tekst terug, zonder toelichting.
                 "content": model_prompt,
             },
         ],
-    )
+    ))
 
     return response.choices[0].message.content.strip()
 

@@ -259,7 +259,7 @@ def validate_and_generate(
     
     except Exception as error:
         raise gr.Error(
-            "De factuurtekst kon niet worden gegenereerd. "
+            "De tekst kon niet worden gegenereerd. "
             "Controleer je API-configuratie en probeer opnieuw."
         ) from error
 
@@ -297,144 +297,268 @@ APP_CSS = """
     --tvb-green-dark: #2D9A8E;
     --tvb-light: #F5F7FA;
     --tvb-secondary: #B8C4D2;
-    --tvb-white: #FFFFFF;
-}
-/* Veldnamen staan op witte kaarten, dus donker maken */
-.gradio-container label,
-.gradio-container label span,
-.gradio-container .label-wrap,
-.gradio-container .info,
-.gradio-container p {
-    color: #222D4F !important;
+
+    /* Rollen: deze wisselen tussen licht en donker */
+    --tvb-bg: #F5F7FA;
+    --tvb-vlak: #FFFFFF;
+    --tvb-tekst: #222D4F;
+    --tvb-rand: #DDE3EB;
+    --tvb-rand-sterk: #B8C4D2;
+    --tvb-muted: #5B6782;
+    --tvb-placeholder: #7A8499;
+    --tvb-kop: #222D4F;
+    --tvb-keuze: #E3F4F2;
 }
 
-/* Markdown tekst op de donkerblauwe achtergrond */
-.gradio-container .prose,
-.gradio-container .prose p {
-    color: #FFFFFF !important;
+/* Donkere modus: Gradio zet de klasse "dark" op body (systeeminstelling of de knop) */
+body.dark {
+    --tvb-bg: #141C31;
+    --tvb-vlak: #1C2640;
+    --tvb-tekst: #E6EBF2;
+    --tvb-rand: #2F3B5E;
+    --tvb-rand-sterk: #4A5880;
+    --tvb-muted: #A3AEC4;
+    --tvb-placeholder: #7F8AA3;
+    --tvb-kop: #0F1627;
+    --tvb-keuze: rgba(56, 181, 168, 0.18);
 }
 
-/* Tekst IN invoervelden juist donker houden */
-.gradio-container input,
-.gradio-container textarea,
-.gradio-container select {
-    color: #222D4F !important;
+/* Effen lichte achtergrond over de hele pagina (ook bij scrollen) */
+html,
+body,
+gradio-app,
+.gradio-container,
+main {
+    background: var(--tvb-bg) !important;
+    margin: 0 !important;
 }
 
-/* Placeholder in invoervelden */
-.gradio-container input::placeholder,
-.gradio-container textarea::placeholder {
-    color: #6B7280 !important;
+/* html staat boven body en ziet de donkere variabelen dus niet */
+html:has(body.dark) {
+    background: #141C31 !important;
+}
+
+/* Laat de blauwe kopbalk buiten de container doorlopen; horizontaal scrollen voorkomen */
+html,
+body {
+    overflow-x: clip !important;
+}
+
+.gradio-container,
+.gradio-container .main,
+.gradio-container .wrap,
+.gradio-container main.contain {
+    overflow: visible !important;
 }
 
 .gradio-container {
-    background: linear-gradient(
-        135deg,
-        #222D4F 0%,
-        #2A3763 35%,
-        #F5F7FA 100%
-    ) !important;
+    max-width: 1280px !important;
+    margin: 0 auto !important;
+    padding: 0 24px 48px !important;
+    color: var(--tvb-tekst);
 }
 
-h1 {
-    color: var(--tvb-blue) !important;
-    font-size: 3.5rem !important;
-    font-weight: 700 !important;
-    text-align: center !important;
-    border-bottom: 4px solid var(--tvb-green);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
+.gradio-container label span,
+.gradio-container .prose,
+.gradio-container .prose p {
+    color: var(--tvb-tekst) !important;
 }
 
-h2,h3,h4,h5,h6 {
-    color: var(--tvb-blue) !important;
+.gradio-container .info {
+    color: var(--tvb-muted) !important;
 }
 
-/* Kaarten */
-.panel,
-.gr-group,
-.gr-box {
-    background: white !important;
-    border: 2px solid var(--tvb-secondary) !important;
-    border-radius: 18px !important;
-    box-shadow: 0 8px 25px rgba(34,45,79,0.15) !important;
+/* Kop bovenaan: donkerblauwe balk die over de volle breedte doorloopt achter de tabs.
+   De schaduw + clip-path maakt hem breder dan de container zonder de layout te verschuiven. */
+#app-kop {
+    background: var(--tvb-kop);
+    box-shadow: 0 0 0 100vmax var(--tvb-kop);
+    clip-path: inset(-100vmax -100vmax 0);
+    padding: 14px 0 0 !important;
+    margin-bottom: calc(-1 * var(--layout-gap, 16px)) !important;
+    align-items: center !important;
+    border: none !important;
+    gap: 16px !important;
 }
 
-/* Tabs (paginakoppen): goed leesbaar op de donkerblauwe achtergrond */
-button[role="tab"] {
+#app-kop .app-naam,
+#app-kop .app-naam * {
     color: #FFFFFF !important;
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 2px solid var(--tvb-secondary) !important;
-    border-radius: 10px 10px 0 0 !important;
-    font-size: 1.1rem !important;
-    font-weight: 700 !important;
-    padding: 10px 22px !important;
-    margin-right: 6px !important;
-    opacity: 1 !important;
+    font-size: 1.25rem;
+    line-height: 1.3;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
 }
 
-button[role="tab"]:hover {
-    background: rgba(255, 255, 255, 0.18) !important;
+#app-kop .app-naam strong {
+    font-weight: 700;
 }
 
-button[role="tab"].selected,
-button[role="tab"][aria-selected="true"] {
-    background: var(--tvb-green) !important;
-    border-color: var(--tvb-green) !important;
+#app-kop .app-naam span {
+    color: var(--tvb-secondary) !important;
+}
+
+/* Wisselknop licht/donker rechts in de kopbalk */
+#app-kop button.thema-knop {
+    background: transparent !important;
+    color: #FFFFFF !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.35) !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+}
+
+#app-kop button.thema-knop:hover {
+    border-color: #FFFFFF !important;
+}
+
+/* Tabs in de blauwe balk */
+.tab-wrapper {
+    background: var(--tvb-kop);
+    box-shadow: 0 0 0 100vmax var(--tvb-kop);
+    clip-path: inset(0 -100vmax);
+    margin-bottom: 28px !important;
+    border: none !important;
+}
+
+.tab-wrapper button[role="tab"] {
+    color: rgba(255, 255, 255, 0.72) !important;
+    background: transparent !important;
+    border: none !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    padding: 14px 18px 12px !important;
+}
+
+.tab-wrapper button[role="tab"]:hover {
     color: #FFFFFF !important;
 }
 
-/* Gradio zet onder het gekozen tabblad een streep; die hebben we niet nodig */
-button[role="tab"].selected::after {
+.tab-wrapper button[role="tab"].selected,
+.tab-wrapper button[role="tab"][aria-selected="true"] {
+    color: #FFFFFF !important;
+    box-shadow: inset 0 -3px 0 var(--tvb-green) !important;
+}
+
+.tab-wrapper button[role="tab"].selected::after {
     display: none !important;
 }
 
+/* Korte uitleg bovenaan elke tab */
+.pagina-intro p {
+    max-width: 68ch;
+    margin: 0 0 20px !important;
+    font-size: 1.05rem !important;
+    line-height: 1.55 !important;
+}
 
-/* Primaire knoppen */
-button.primary,
-button[variant="primary"] {
-    background: linear-gradient(
-        90deg,
-        var(--tvb-blue),
-        #304064
-    ) !important;
-    color: white !important;
+/* Panelen (wit in licht, donkerblauw in donker) */
+.paneel {
+    background: var(--tvb-vlak) !important;
+    border: 1px solid var(--tvb-rand) !important;
+    border-radius: 14px !important;
+    padding: 20px !important;
+    gap: 16px !important;
+}
+
+/* Binnen een paneel geen extra grijze vakken en randen rond de velden */
+.paneel .form,
+.paneel .block {
+    background: transparent !important;
     border: none !important;
+    box-shadow: none !important;
+}
+
+.paneel .block {
+    padding: 0 !important;
+}
+
+.paneel .form {
+    gap: 16px !important;
+}
+
+/* Velden naast elkaar onderaan uitlijnen, ook als de uitleg erboven verschilt */
+.rij-onder,
+.rij-onder > .form {
+    align-items: flex-end !important;
+}
+
+/* Dropdowns: één witte rand zoals de andere velden, geen grijs vak eromheen */
+.paneel .container > .wrap {
+    background: var(--tvb-vlak) !important;
+    border: 1.5px solid var(--tvb-rand) !important;
     border-radius: 10px !important;
-    font-weight: 700 !important;
-    box-shadow: 0 4px 12px rgba(34,45,79,.3) !important;
+    box-shadow: none !important;
 }
 
-
-/* Hover */
-button.primary:hover,
-button[variant="primary"]:hover {
-    background: var(--tvb-blue-dark) !important;
+.paneel .container > .wrap input[role="combobox"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
-/* Secondary */
-button.secondary,
-button[variant="secondary"] {
+.paneel .container > .wrap:focus-within {
+    border-color: var(--tvb-green) !important;
+    box-shadow: 0 0 0 3px rgba(56, 181, 168, 0.2) !important;
+}
+
+/* Primaire knop: TVB-groen met donkerblauwe tekst (wit op groen is te weinig contrast) */
+button.primary {
     background: var(--tvb-green) !important;
-    color: white !important;
+    color: var(--tvb-blue) !important;
     border: none !important;
     border-radius: 10px !important;
     font-weight: 700 !important;
+    font-size: 1.05rem !important;
 }
 
-button.secondary:hover,
-button[variant="secondary"]:hover {
+button.primary:hover {
     background: var(--tvb-green-dark) !important;
+    color: #FFFFFF !important;
 }
 
-/* Radio buttons: de gekozen optie duidelijk groen markeren */
+/* Secundaire knop: wit met rand */
+button.secondary {
+    background: var(--tvb-vlak) !important;
+    color: var(--tvb-tekst) !important;
+    border: 1.5px solid var(--tvb-rand-sterk) !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+}
+
+button.secondary:hover {
+    border-color: var(--tvb-tekst) !important;
+}
+
+/* Wissen: bewust onopvallend, het is geen hoofdactie */
+button.secondary.knop-stil {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    flex-grow: 0 !important;
+    color: var(--tvb-muted) !important;
+    font-weight: 500 !important;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+button.secondary.knop-stil:hover {
+    color: var(--tvb-tekst) !important;
+}
+
+button:focus-visible {
+    outline: 3px solid var(--tvb-green) !important;
+    outline-offset: 2px !important;
+}
+
+/* Radio buttons: de gekozen optie duidelijk markeren */
 input[type="radio"] {
     accent-color: var(--tvb-green) !important;
 }
 
 .gradio-container label:has(> input[type="radio"]) {
-    background: var(--tvb-light) !important;
-    border: 2px solid var(--tvb-secondary) !important;
+    background: var(--tvb-bg) !important;
+    border: 1.5px solid var(--tvb-rand) !important;
     border-radius: 10px !important;
     padding: 8px 14px !important;
     cursor: pointer !important;
@@ -442,282 +566,217 @@ input[type="radio"] {
 
 .gradio-container label:has(> input[type="radio"]:checked),
 .gradio-container label.selected:has(> input[type="radio"]) {
-    background: var(--tvb-green) !important;
-    border-color: var(--tvb-green-dark) !important;
+    background: var(--tvb-keuze) !important;
+    border-color: var(--tvb-green) !important;
 }
 
-.gradio-container label:has(> input[type="radio"]:checked) span,
-.gradio-container label.selected:has(> input[type="radio"]) span {
-    color: #FFFFFF !important;
+.gradio-container label:has(> input[type="radio"]:checked) span {
     font-weight: 700 !important;
 }
 
 /* Upload component */
 [data-testid="file-upload"] {
-    border: 2px dashed var(--tvb-green) !important;
+    border: 1.5px dashed var(--tvb-rand-sterk) !important;
     border-radius: 12px !important;
 }
 
-/* Inputs (niet de rondjes van radio buttons, anders verdwijnt de selectie) */
+/* Invoervelden (niet de rondjes van radio buttons, anders verdwijnt de selectie) */
 input:not([type="radio"]):not([type="checkbox"]),
 textarea,
 select {
-    border: 2px solid var(--tvb-secondary) !important;
+    color: var(--tvb-tekst) !important;
+    border: 1.5px solid var(--tvb-rand) !important;
     border-radius: 10px !important;
-    background: white !important;
+    background: var(--tvb-vlak) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--tvb-placeholder) !important;
 }
 
 input:focus,
 textarea:focus,
 select:focus {
     border-color: var(--tvb-green) !important;
-    box-shadow: 0 0 0 3px rgba(56,181,168,.2) !important;
-}
-/* Voorkom witte randen bij scrollen */
-html,
-body {
-    margin: 0 !important;
-    padding: 0 !important;
-    background-color: #222D4F !important;
-    min-height: 100% !important;
+    box-shadow: 0 0 0 3px rgba(56, 181, 168, 0.2) !important;
 }
 
-body {
-    min-height: 100vh !important;
+/* Leeg Word-vak klein houden zolang er nog geen document is */
+#word-download .empty {
+    min-height: 64px !important;
+    height: 64px !important;
 }
 
-/* Laat Gradio de volledige pagina bedekken */
-.gradio-container {
-    width: 100% !important;
-    max-width: none !important;
-    min-height: 100vh !important;
-    margin: 0 !important;
-    background-color: #222D4F !important;
-}
-/* =========================================
-   FIX: WITTE ZIJKANTEN BIJ SCROLLEN
-   ========================================= */
-
-html,
-body,
-gradio-app,
-.gradio-container,
-.main,
-main {
-    background: #222D4F !important;
-    background-color: #222D4F !important;
-}
-
-/* Hele browserbreedte gebruiken */
-html,
-body {
-    width: 100% !important;
-    min-width: 100% !important;
-    min-height: 100vh !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow-x: hidden !important;
-}
-
-/* Gradio root volledig vullen */
-gradio-app {
-    display: block !important;
-    width: 100% !important;
-    min-height: 100vh !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-/* Gradio container geen witte buitenruimte geven */
-.gradio-container {
-    width: 100vw !important;
-    max-width: 100vw !important;
-    min-height: 100vh !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-}
-/* Bovenste titelkaart */
-#factuur-title {
-    background: #FFFFFF !important;
-    border: 2px solid #B8C4D2 !important;
-    border-left: 7px solid #38B5A8 !important;
-    border-radius: 16px !important;
-    padding: 22px 26px !important;
-    margin-bottom: 18px !important;
-    box-shadow: 0 8px 25px rgba(34, 45, 79, 0.18) !important;
-}
-
-/* Alle tekst in de bovenste titelkaart donker houden */
-#factuur-title,
-#factuur-title h1,
-#factuur-title h2,
-#factuur-title h3,
-#factuur-title p,
-#factuur-title .prose,
-#factuur-title .prose p {
-    color: #222D4F !important;
-}
-
-/* Hoofdtitel */
-#factuur-title h1 {
-    color: #222D4F !important;
-    font-size: 3rem !important;
-    font-weight: 700 !important;
-    text-align: center !important;
-    border-bottom: 4px solid #38B5A8 !important;
-    padding-bottom: 12px !important;
-    margin-top: 0 !important;
-    margin-bottom: 14px !important;
-}
-
-/* Beschrijving onder de hoofdtitel */
-#factuur-title p {
-    color: #222D4F !important;
-    text-align: center !important;
-    font-size: 1.05rem !important;
-    margin-bottom: 0 !important;
-}
-
-/* Titelkaart in de Factuurgenerator-tab */
-#originele-tekst-title {
-    background: #FFFFFF !important;
-    border: 2px solid #B8C4D2 !important;
-    border-left: 7px solid #38B5A8 !important;
-    border-radius: 14px !important;
-    padding: 16px 20px !important;
-    margin-top: 14px !important;
-    margin-bottom: 18px !important;
-    box-shadow: 0 6px 18px rgba(34, 45, 79, 0.15) !important;
-}
-
-/* Tekst van de titel donkerblauw houden */
-#originele-tekst-title,
-#originele-tekst-title h1,
-#originele-tekst-title h2,
-#originele-tekst-title h3,
-#originele-tekst-title p,
-#originele-tekst-title .prose,
-#originele-tekst-title .prose p {
-    color: #222D4F !important;
-}
-
-/* Opmaak van de tweede titel */
-#originele-tekst-title h2 {
-    color: #222D4F !important;
-    font-size: 1.55rem !important;
-    font-weight: 700 !important;
-    margin: 0 !important;
-    border: none !important;
+/* Resultaat: iets rustiger leesbaar */
+#tekst-resultaat textarea {
+    font-size: 1rem !important;
+    line-height: 1.6 !important;
 }
 """
+
+MODUS_NIEUW = "Nieuwe tekst genereren"
+MODUS_HERSCHRIJVEN = "Tekst herschrijven"
+
+
+# Licht/donker wisselen gebeurt in de browser; de keuze blijft per browser bewaard.
+THEMA_WISSELEN_JS = """
+() => {
+    const donker = document.body.classList.toggle("dark");
+    try { localStorage.setItem("tvb-thema", donker ? "dark" : "light"); } catch (e) {}
+}
+"""
+
+THEMA_HERSTELLEN_JS = """
+() => {
+    let thema = null;
+    try { thema = localStorage.getItem("tvb-thema"); } catch (e) {}
+    if (thema === "dark") document.body.classList.add("dark");
+    if (thema === "light") document.body.classList.remove("dark");
+}
+"""
+
+
+def open_brontekst_bij_herschrijven(modus):
+    """Bij herschrijven is de bestaande tekst verplicht, dus klap die open."""
+    if modus == MODUS_HERSCHRIJVEN:
+        return gr.Accordion(open=True)
+    return gr.update()
+
 
 with gr.Blocks(
     title="AI in marketing",
 ) as demo:
 
+    with gr.Row(elem_id="app-kop", equal_height=True):
+        gr.HTML("<strong>TVB</strong> <span>Marketing-AI</span>", elem_classes="app-naam")
+        thema_knop = gr.Button(
+            "Licht of donker",
+            variant="secondary",
+            size="sm",
+            scale=0,
+            min_width=130,
+            elem_classes="thema-knop",
+        )
+
+    thema_knop.click(fn=None, js=THEMA_WISSELEN_JS)
+    demo.load(fn=None, js=THEMA_HERSTELLEN_JS)
+
     # ==================================================
-    # TAB 1 - FACTUURGENERATOR
+    # TAB 1 - TEKST MAKEN
     # ==================================================
 
-    with gr.Tab("Factuurgeneratie"):
+    with gr.Tab("Tekst maken"):
 
         gr.Markdown(
-            """
-        # Factuurgeneratie
-
-        Genereer automatisch marketingteksten en download ze als Word-document.
-        """,
-            elem_id="factuur-title",
+            "Schrijf een marketingtekst in de tone of voice van een van onze "
+            "bedrijven. Kopieer hem direct of download hem als Word-document.",
+            elem_classes="pagina-intro",
         )
 
-        gr.Markdown(
-            """
-        ## Originele tekst maken in de stijl van de trainingsteksten
-        """,
-            elem_id="originele-tekst-title",
-        )
+        with gr.Row(equal_height=False):
+            with gr.Column(scale=3, elem_classes="paneel"):
 
-        document = gr.File(
-            label="Originele tekst of opdracht voor de AI (optioneel) ",
-            file_types=[".txt", ".md", ".csv", ".pdf", ".docx"],
-            type="filepath",
-        )
+                with gr.Row(elem_classes="rij-onder"):
+                    bedrijf = gr.Dropdown(
+                        label="Bedrijf",
+                        choices=[],
+                        allow_custom_value=False,
+                        info="De AI zoekt de tone of voice en kernwaarden van dit bedrijf.",
+                    )
 
-        style_text = gr.Textbox(
-            label="Originele tekst of opdracht voor de AI",
-            lines=6,
-            placeholder=(
-                "Plak hier een voorbeeldtekst of stijlregels, bijv.: korte zinnen, "
-                "formele toon, veel concrete termen."
-            ),
-        )
+                    kanaal = gr.Dropdown(
+                        choices=["LinkedIn", "Website", "Instagram"],
+                        value="LinkedIn",
+                        label="Kanaal",
+                        info="De AI gebruikt voorbeeldteksten van dit kanaal.",
+                    )
 
-        modus = gr.Radio(
-            choices=["Nieuwe tekst genereren", "Tekst herschrijven"],
-            value="Nieuwe tekst genereren",
-            label="Functie",
-        )
+                modus = gr.Radio(
+                    choices=[MODUS_NIEUW, MODUS_HERSCHRIJVEN],
+                    value=MODUS_NIEUW,
+                    label="Wat wil je doen?",
+                )
 
-        # Onthoudt of de gebruiker zelf een functie heeft aangeklikt.
-        modus_handmatig = gr.State(False)
+                # Onthoudt of de gebruiker zelf een functie heeft aangeklikt.
+                modus_handmatig = gr.State(False)
 
-        tekst_prompt = gr.Textbox(
-            label="Tekstbewerking",
-            lines=4,
-            placeholder=(
-                "Bijvoorbeeld: schrijf kort en gebruik maximaal 5 opsommingstekens."
-            ),
-        )
+                with gr.Row():
+                    aanleiding = gr.Textbox(
+                        label="Aanleiding",
+                        lines=3,
+                        placeholder="Waarom wordt deze tekst gemaakt?",
+                    )
 
-        with gr.Row():
-            aanleiding = gr.Textbox(
-                label="Aanleiding",
-                lines=3,
-                placeholder="Waarom wordt deze tekst gemaakt?",
-            )
+                    insteek = gr.Textbox(
+                        label="Insteek",
+                        lines=3,
+                        placeholder="Welke invalshoek of boodschap moet centraal staan?",
+                    )
 
-            insteek = gr.Textbox(
-                label="Insteek",
-                lines=3,
-                placeholder="Welke invalshoek of boodschap moet centraal staan?",
-            )
+                doelgroep = gr.Textbox(
+                    label="Doelgroep",
+                    lines=2,
+                    placeholder="Voor wie is deze tekst bedoeld?",
+                )
 
-        with gr.Row():
-            doelgroep = gr.Textbox(
-                label="Doelgroep",
-                lines=3,
-                placeholder="Voor wie is deze tekst bedoeld?",
-            )
+                tekst_prompt = gr.Textbox(
+                    label="Extra instructies (optioneel)",
+                    lines=3,
+                    placeholder=(
+                        "Bijvoorbeeld: schrijf kort en gebruik maximaal 5 opsommingstekens."
+                    ),
+                )
 
-            bedrijf = gr.Dropdown(
-                label="Bedrijf",
-                choices=[],
-                allow_custom_value=False,
-                info="De AI zoekt de tone of voice en kernwaarden van dit bedrijf.",
-            )
+                with gr.Accordion("Bestaande tekst (optioneel)", open=False) as brontekst:
+                    style_text = gr.Textbox(
+                        label="Plak een tekst",
+                        lines=6,
+                        info=(
+                            "Bij een nieuwe tekst gebruikt de AI dit als stijlvoorbeeld. "
+                            "Bij herschrijven is dit de tekst die herschreven wordt."
+                        ),
+                        placeholder=(
+                            "Plak hier een voorbeeldtekst of stijlregels, bijv.: korte zinnen, "
+                            "formele toon, veel concrete termen."
+                        ),
+                    )
 
-        kanaal = gr.Dropdown(
-            choices=["LinkedIn", "Website", "Instagram"],
-            value="LinkedIn",
-            label="Kanaal",
-        )
+                    document = gr.File(
+                        label="Of upload een bestand",
+                        file_types=[".txt", ".md", ".csv", ".pdf", ".docx"],
+                        type="filepath",
+                    )
 
-        genereer_button = gr.Button(
-            "Tekst maken",
-            variant="primary",
-        )
+                with gr.Row():
+                    genereer_button = gr.Button(
+                        "Tekst maken",
+                        variant="primary",
+                        scale=3,
+                    )
 
-        wis_button = gr.Button("Omschrijving wissen", variant="secondary")
+                    wis_button = gr.Button(
+                        "Formulier wissen",
+                        variant="secondary",
+                        elem_classes="knop-stil",
+                        scale=1,
+                    )
 
-        factuur_resultaat = gr.Textbox(
-            label="Gegenereerde factuurtekst",
-            lines=12,
-        )
+            with gr.Column(scale=2, elem_classes="paneel"):
 
-        download_file = gr.File(
-            label="Download als Word-document",
-            type="filepath",
-        )
+                tekst_resultaat = gr.Textbox(
+                    label="Jouw tekst",
+                    lines=20,
+                    placeholder="Vul links het formulier in en klik op Tekst maken.",
+                    buttons=["copy"],
+                    elem_id="tekst-resultaat",
+                )
+
+                download_file = gr.File(
+                    label="Word-document",
+                    type="filepath",
+                    elem_id="word-download",
+                )
 
         genereer_button.click(
             fn=validate_and_generate,
@@ -732,7 +791,7 @@ with gr.Blocks(
                 bedrijf,
                 kanaal,
             ],
-            outputs=[factuur_resultaat, download_file],
+            outputs=[tekst_resultaat, download_file],
         )
 
 
@@ -740,6 +799,12 @@ with gr.Blocks(
             fn=lambda: True,
             inputs=[],
             outputs=modus_handmatig,
+        )
+
+        modus.change(
+            fn=open_brontekst_bij_herschrijven,
+            inputs=modus,
+            outputs=brontekst,
         )
 
         style_text.input(
@@ -753,7 +818,7 @@ with gr.Blocks(
                 None,
                 "",
                 "",
-                "Nieuwe tekst genereren",
+                MODUS_NIEUW,
                 "",
                 "",
                 "",
@@ -785,65 +850,62 @@ with gr.Blocks(
     with gr.Tab("Weekplanning"):
 
         gr.Markdown(
-            """
-        # Weekplanning
-
-        Wat moet er deze week de deur uit? Maak in één keer Word-concepten
-        voor alle geplande posts, of download de planning als Excel.
-        """,
-            elem_id="factuur-title",
+            "Wat moet er deze week de deur uit? Maak in één keer Word-concepten "
+            "voor alle geplande posts, of download de planning als Excel.",
+            elem_classes="pagina-intro",
         )
 
-        with gr.Row():
-            planning_week = gr.Dropdown(
-                label="Week",
-                choices=[],
-                scale=3,
-            )
-            planning_bedrijf = gr.Dropdown(
-                label="Bedrijf",
-                choices=[],
-                scale=2,
-            )
-            planning_vernieuwen = gr.Button(
-                "Planning vernieuwen",
-                variant="secondary",
-                scale=1,
-            )
+        with gr.Column(elem_classes="paneel"):
+            with gr.Row():
+                planning_week = gr.Dropdown(
+                    label="Week",
+                    choices=[],
+                    scale=3,
+                )
+                planning_bedrijf = gr.Dropdown(
+                    label="Bedrijf",
+                    choices=[],
+                    scale=2,
+                )
+                planning_vernieuwen = gr.Button(
+                    "Planning vernieuwen",
+                    variant="secondary",
+                    scale=1,
+                )
 
-        planning_tabel = gr.Dataframe(
-            label="Geplande posts",
-            interactive=False,
-            wrap=True,
-        )
-
-        planning_opnieuw = gr.Checkbox(
-            label="Bestaande concepten opnieuw maken (kost extra API-aanroepen)",
-            value=False,
-        )
-
-        with gr.Row():
-            concepten_button = gr.Button(
-                "Concepten maken voor deze week",
-                variant="primary",
-            )
-            excel_button = gr.Button(
-                "Planning downloaden (Excel)",
-                variant="secondary",
+            planning_tabel = gr.Dataframe(
+                label="Geplande posts",
+                interactive=False,
+                wrap=True,
             )
 
-        planning_status = gr.Textbox(label="Status", interactive=False)
+            planning_opnieuw = gr.Checkbox(
+                label="Bestaande concepten opnieuw maken (kost extra API-aanroepen)",
+                value=False,
+            )
 
-        planning_bestanden = gr.File(
-            label="Concepten (Word)",
-            file_count="multiple",
-            interactive=False,
-        )
+            with gr.Row():
+                concepten_button = gr.Button(
+                    "Concepten maken voor deze week",
+                    variant="primary",
+                )
+                excel_button = gr.Button(
+                    "Planning downloaden (Excel)",
+                    variant="secondary",
+                )
 
-        planning_excel = gr.File(
-            label="Planning als Excel (één regel per post, met filters)",
-            interactive=False,
-        )
+            planning_status = gr.Textbox(label="Status", interactive=False)
+
+            planning_bestanden = gr.File(
+                label="Concepten (Word)",
+                file_count="multiple",
+                interactive=False,
+            )
+
+            planning_excel = gr.File(
+                label="Planning als Excel (één regel per post, met filters)",
+                interactive=False,
+            )
 
         for keuzelijst in (planning_week, planning_bedrijf):
             keuzelijst.change(

@@ -107,6 +107,54 @@ class PerformanceTests(unittest.TestCase):
         self.assertEqual(app.update_modus_from_text("Tekst", True), app.gr.update())
         self.assertEqual(app.update_modus_from_text("", True), app.gr.update())
 
+    def test_fast_model_answer_needs_one_request(self):
+        calls = []
+        with patch.object(generation, "MODEL_RESERVE_NA", 0.2):
+            result = generation._vraag_model(lambda: calls.append(1) or "snel")
+        self.assertEqual(result, "snel")
+        self.assertEqual(len(calls), 1)
+
+    def test_slow_model_answer_starts_reserve_request(self):
+        import threading
+        import time
+
+        eerste_blijft_hangen = threading.Event()
+        calls = []
+
+        def aanroep():
+            calls.append(1)
+            if len(calls) == 1:
+                eerste_blijft_hangen.wait(2)  # eerste aanvraag staat in de rij
+                return "traag"
+            return "reserve"
+
+        start = time.perf_counter()
+        with patch.object(generation, "MODEL_RESERVE_NA", 0.1):
+            result = generation._vraag_model(aanroep)
+        duur = time.perf_counter() - start
+        eerste_blijft_hangen.set()
+
+        self.assertEqual(result, "reserve")
+        self.assertEqual(len(calls), 2)
+        self.assertLess(duur, 1)
+
+    def test_failed_request_is_retried_and_last_error_raised(self):
+        calls = []
+
+        def mislukt():
+            calls.append(1)
+            raise RuntimeError(f"fout {len(calls)}")
+
+        with patch.object(generation, "MODEL_RESERVE_NA", 0.1), self.assertRaisesRegex(RuntimeError, "fout 3"):
+            generation._vraag_model(mislukt)
+        self.assertEqual(len(calls), generation.MODEL_MAX_POGINGEN)
+
+    def test_reserve_can_be_disabled(self):
+        calls = []
+        with patch.object(generation, "MODEL_RESERVE_NA", 0):
+            self.assertEqual(generation._vraag_model(lambda: calls.append(1) or "ok"), "ok")
+        self.assertEqual(len(calls), 1)
+
     def test_schema_created_once(self):
         with patch.object(app, "_database_ready", False), patch.object(app, "create_connection"), patch.object(
             app, "create_schema"
