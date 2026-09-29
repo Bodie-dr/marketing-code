@@ -909,8 +909,6 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=port,
         theme=APP_THEME,
-        css=APP_CSS,
-        # Word-concepten en agenda staan in <project>/outputs.
-        allowed_paths=[str(PROJECT_DIR / "outputs")],
+        css=APP_CSS
     )
 
