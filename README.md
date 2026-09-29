@@ -11,7 +11,7 @@ marketing code/
 │   ├── ingest_documents.py   # documenten inlezen in de database
 │   ├── marketing.sqlite3     # kennisbank (lokaal, niet in git)
 │   └── test_performance.py   # tests
-├── foto_generation/          # upscalen via Claid.ai en Pixelcut
+├── foto_generation/          # Qwen test-app: stijl leren + foto bewerken
 ├── calander_automatisering/  # social-media jaarplanning uit Excel
 ├── documents/                # trainingsdocumenten, één submap per bedrijf
 └── outputs/                  # gegenereerde bestanden (niet in git)
@@ -36,8 +36,8 @@ copy .env.example .env   # en vul de sleutels in
 | Tekstgenerator starten | `python text_generator/app.py` |
 | Documenten inlezen | `python text_generator/ingest_documents.py` |
 | Tests | `cd text_generator; python -m unittest test_performance -v` |
-| Claid upscale-test | `python foto_generation/test_claid.py` |
-| Pixelcut upscale-test | `python foto_generation/test_pixelcut.py` |
+| Qwen foto-app starten | `python foto_generation/qwen_app.py` (http://127.0.0.1:7861) |
+| Tests Qwen-app | `cd foto_generation; python -m unittest test_qwen_backend -v` |
 | Jaarplanning inlezen | `python calander_automatisering/calander.py` |
 | Weekoverzicht | `python calander_automatisering/calander.py week --weken 2` |
 | Planning als Excel | `python calander_automatisering/calander.py excel` |
@@ -59,3 +59,16 @@ Het pad naar de jaarplanning stel je in met `CALENDAR_EXCEL_FILE` in `.env`
 
 `ingest_documents.py` leest standaard de map uit `DOCUMENTS_FOLDER` in `.env`;
 elke submap wordt een bedrijf in de dropdown van de app.
+
+### Qwen foto-app
+
+Tabblad **Stijl leren**: upload referentiefoto's, Qwen3-VL beschrijft de
+gemeenschappelijke stijl (kleuren, licht, compositie, sfeer, nabewerking) en
+slaat die op in `outputs/qwen/stijlen/`. Tabblad **Foto bewerken**: pas een foto
+aan met een instructie en/of een opgeslagen stijl; resultaten komen in
+`outputs/qwen/bewerkt/`.
+
+`QWEN_BACKEND` in `.env`: `auto` (lokaal als er een CUDA-GPU is, anders cloud),
+`lokaal` (het gedownloade Qwen-Image-2.1, ±31 GB, NVIDIA-GPU nodig) of `cloud`
+(Hugging Face Inference Providers; `HF_TOKEN` moet de permissie
+*Make calls to Inference Providers* hebben).
