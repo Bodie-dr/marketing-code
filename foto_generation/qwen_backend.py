@@ -55,7 +55,7 @@ referentiefoto's gemeen hebben (niet de onderwerpen zelf). Antwoord uitsluitend
 met één JSON-object met deze sleutels:
 
 - "samenvatting": 1-2 zinnen in het Nederlands over de stijl
-- "kleurpalet": lijst met de belangrijkste kleuren als hex-codes
+- "kleurpalet": neem exact de gemeten hex-codes hieronder over
 - "belichting": type licht, richting, contrast (Nederlands)
 - "compositie": kadrering, camerahoek, scherptediepte (Nederlands)
 - "sfeer": gevoel en toon (Nederlands)
@@ -63,6 +63,20 @@ met één JSON-object met deze sleutels:
 - "stijl_prompt": één Engelse zin die deze stijl beschrijft als instructie
   voor een beeldmodel, zonder onderwerpen te noemen
 """
+
+
+def _instructie_met_palet(palet: list[dict]) -> str:
+    """Geef het model de gemeten kleuren mee: hexcodes raden kan het niet."""
+    regels = [
+        f"- {kleur['hex']} ({kleur['soort']}kleur, {kleur['aandeel']:.0%} van de pixels)"
+        for kleur in palet
+    ]
+    return (
+        ANALYSE_INSTRUCTIE
+        + "\nGemeten kleuren (uit de pixels van de foto's, betrouwbaar):\n"
+        + "\n".join(regels)
+        + "\nBaseer je beschrijving van kleur en sfeer op deze gemeten kleuren."
+    )
 
 
 def _cuda_beschikbaar() -> bool:
@@ -96,6 +110,39 @@ def naar_data_url(afbeelding: Image.Image) -> str:
     buffer = io.BytesIO()
     verklein(afbeelding).save(buffer, format="JPEG", quality=90)
     return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
+FOTO_EXTENSIES = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+
+# Meer foto's maken de analyse traag en (in de cloud) duur, zonder dat de
+# stijl er veel nauwkeuriger van wordt.
+MAX_REFERENTIES = int(os.getenv("QWEN_MAX_REFERENTIES", "12"))
+
+
+def verzamel_fotos(paden) -> list[Path]:
+    """Losse bestanden en mappen (inclusief submappen) -> gesorteerde fotolijst."""
+    gevonden = set()
+    for pad in paden:
+        if not pad:
+            continue
+        pad = Path(str(pad).strip().strip('"'))
+        kandidaten = pad.rglob("*") if pad.is_dir() else [pad]
+        for bestand in kandidaten:
+            if (
+                bestand.is_file()
+                and bestand.suffix.lower() in FOTO_EXTENSIES
+                and not bestand.name.startswith((".", "~$"))
+            ):
+                gevonden.add(bestand.resolve())
+    return sorted(gevonden, key=lambda p: str(p).casefold())
+
+
+def kies_verdeeld(paden: list, maximum: int = MAX_REFERENTIES) -> list:
+    """Kies maximaal `maximum` items, gelijkmatig verspreid over de lijst."""
+    if maximum <= 0 or len(paden) <= maximum:
+        return list(paden)
+    stap = len(paden) / maximum
+    return [paden[int(i * stap)] for i in range(maximum)]
 
 
 def lees_stijl_json(tekst: str) -> dict:
@@ -198,9 +245,9 @@ def _vertaal_hf_fout(fout: Exception) -> Exception:
     return fout
 
 
-def _analyseer_cloud(fotos: Sequence[Image.Image]) -> str:
+def _analyseer_cloud(fotos: Sequence[Image.Image], instructie: str = ANALYSE_INSTRUCTIE) -> str:
     inhoud = [{"type": "image_url", "image_url": {"url": naar_data_url(f)}} for f in fotos]
-    inhoud.append({"type": "text", "text": ANALYSE_INSTRUCTIE})
+    inhoud.append({"type": "text", "text": instructie})
     try:
         antwoord = _hf_client().chat_completion(
             model=CLOUD_ANALYSE_MODEL,
@@ -259,7 +306,7 @@ def _laad_vl():
     return _vl_model, _vl_processor
 
 
-def _analyseer_lokaal(fotos: Sequence[Image.Image]) -> str:
+def _analyseer_lokaal(fotos: Sequence[Image.Image], instructie: str = ANALYSE_INSTRUCTIE) -> str:
     _controleer_gpu()
     with _lokaal_lock:
         model, processor = _laad_vl()
@@ -267,7 +314,7 @@ def _analyseer_lokaal(fotos: Sequence[Image.Image]) -> str:
             {
                 "role": "user",
                 "content": [{"type": "image", "image": verklein(f)} for f in fotos]
-                + [{"type": "text", "text": ANALYSE_INSTRUCTIE}],
+                + [{"type": "text", "text": instructie}],
             }
         ]
         invoer = processor.apply_chat_template(
@@ -323,9 +370,18 @@ def analyseer_stijl(fotos: Sequence[Image.Image], backend: str | None = None) ->
     """Leer de gemeenschappelijke stijl van één of meer referentiefoto's."""
     if not fotos:
         raise ValueError("Upload minstens één referentiefoto.")
+    from kleurpalet import extraheer_palet
+
     gekozen = kies_backend(backend)
-    ruw = _analyseer_lokaal(fotos) if gekozen == "lokaal" else _analyseer_cloud(fotos)
-    return lees_stijl_json(ruw), gekozen
+    palet = extraheer_palet(fotos)
+    instructie = _instructie_met_palet(palet)
+    analyseer = _analyseer_lokaal if gekozen == "lokaal" else _analyseer_cloud
+    stijl = lees_stijl_json(analyseer(fotos, instructie))
+
+    # Altijd de gemeten kleuren gebruiken, ook als het model ze toch aanpast.
+    stijl["kleurpalet"] = [kleur["hex"] for kleur in palet]
+    stijl["kleurpalet_details"] = palet
+    return stijl, gekozen
 
 
 def bewerk_foto(

@@ -38,6 +38,7 @@ copy .env.example .env   # en vul de sleutels in
 | Tests | `cd text_generator; python -m unittest test_performance -v` |
 | Qwen foto-app starten | `python foto_generation/qwen_app.py` (http://127.0.0.1:7861) |
 | Tests Qwen-app | `cd foto_generation; python -m unittest test_qwen_backend -v` |
+| Kleurpalet uit foto's | `python foto_generation/kleurpalet.py <map> --png palet.png` |
 | Jaarplanning inlezen | `python calander_automatisering/calander.py` |
 | Weekoverzicht | `python calander_automatisering/calander.py week --weken 2` |
 | Planning als Excel | `python calander_automatisering/calander.py excel` |

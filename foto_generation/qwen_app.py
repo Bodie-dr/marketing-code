@@ -46,27 +46,73 @@ def backend_uitleg() -> str:
     )
 
 
-def leer_stijl(bestanden, naam, backend):
-    if not bestanden:
-        raise gr.Error("Upload minstens één referentiefoto.")
+def _referentie_paden(bestanden, map_upload, map_pad):
+    """Alle foto's uit losse bestanden, een geüploade map en/of een lokaal mappad."""
+    if map_pad and map_pad.strip() and not os.path.isdir(map_pad.strip().strip('"')):
+        raise gr.Error(f"Map niet gevonden: {map_pad.strip()}")
+    return qb.verzamel_fotos([*(bestanden or []), *(map_upload or []), map_pad])
+
+
+def tel_referenties(bestanden, map_upload, map_pad):
+    try:
+        paden = _referentie_paden(bestanden, map_upload, map_pad)
+    except gr.Error as fout:
+        return f"⚠️ {fout.message}"
+    if not paden:
+        return ""
+    gebruikt = len(qb.kies_verdeeld(paden))
+    if gebruikt < len(paden):
+        return (
+            f"**{len(paden)} foto's gevonden.** Er worden er {gebruikt} gebruikt, "
+            "gelijkmatig verdeeld over de map."
+        )
+    return f"**{len(paden)} foto's gevonden.**"
+
+
+def leer_stijl(bestanden, map_upload, map_pad, naam, backend):
+    paden = _referentie_paden(bestanden, map_upload, map_pad)
+    if not paden:
+        raise gr.Error("Upload minstens één referentiefoto, of kies een map met foto's.")
     if not (naam or "").strip():
         raise gr.Error("Geef de stijl een naam, bijvoorbeeld 'TVB zomercampagne'.")
+
+    fotos, onleesbaar = [], 0
+    for pad in qb.kies_verdeeld(paden):
+        try:
+            with Image.open(pad) as foto:
+                # Meteen verkleinen: een map vol grote foto's past anders niet in het geheugen.
+                fotos.append(qb.verklein(foto))
+        except OSError:
+            logger.warning("Foto overgeslagen (onleesbaar): %s", pad)
+            onleesbaar += 1
+    if not fotos:
+        raise gr.Error("Geen van de gekozen foto's kon worden geopend.")
+
     try:
-        fotos = [Image.open(pad) for pad in bestanden]
         stijl, gebruikt = qb.analyseer_stijl(fotos, backend)
         pad = qb.sla_stijl_op(naam, stijl, len(fotos), gebruikt)
     except Exception as fout:
         logger.exception("Stijlanalyse mislukt")
         raise gr.Error(f"Analyse mislukt: {fout}") from fout
 
+    details = stijl.get("kleurpalet_details") or [
+        {"hex": kleur, "aandeel": None, "soort": ""} for kleur in stijl.get("kleurpalet", [])
+    ]
     kleuren = " ".join(
-        f"<span style='display:inline-block;width:28px;height:28px;border-radius:6px;"
-        f"background:{kleur};border:1px solid #ccc' title='{kleur}'></span>"
-        for kleur in stijl.get("kleurpalet", [])
+        f"<span style='display:inline-flex;flex-direction:column;align-items:center;"
+        f"margin-right:6px;font-size:11px'>"
+        f"<span style='width:40px;height:40px;border-radius:6px;background:{kleur['hex']};"
+        f"border:1px solid #ccc' title='{kleur['hex']} ({kleur['soort']})'></span>"
+        f"{kleur['hex']}"
+        + (f"<br>{kleur['aandeel']:.0%}" if kleur["aandeel"] is not None else "")
+        + "</span>"
+        for kleur in details
     )
+    overgeslagen = f", {onleesbaar} onleesbaar overgeslagen" if onleesbaar else ""
     samenvatting = (
         f"**{stijl['samenvatting']}**\n\n{kleuren}\n\n"
-        f"Opgeslagen als `{pad.name}` ({len(fotos)} foto's, backend: {gebruikt})."
+        f"Opgeslagen als `{pad.name}` ({len(fotos)} van {len(paden)} foto's gebruikt"
+        f"{overgeslagen}, backend: {gebruikt})."
     )
     namen = qb.stijl_namen()
     return (
@@ -104,8 +150,8 @@ with gr.Blocks(title="Qwen foto-test") as demo:
 
     with gr.Tab("1. Stijl leren"):
         gr.Markdown(
-            "Upload een paar foto's in de gewenste huisstijl. Qwen3-VL analyseert "
-            "wat ze gemeen hebben en slaat dat op als stijlprofiel."
+            "Upload foto's in de gewenste huisstijl, of kies een hele map. Qwen3-VL "
+            "analyseert wat ze gemeen hebben en slaat dat op als stijlprofiel."
         )
         with gr.Row():
             with gr.Column():
@@ -115,6 +161,17 @@ with gr.Blocks(title="Qwen foto-test") as demo:
                     file_types=["image"],
                     type="filepath",
                 )
+                map_upload = gr.File(
+                    label="Of upload een hele map",
+                    file_count="directory",
+                    type="filepath",
+                )
+                map_pad = gr.Textbox(
+                    label="Of plak het pad van een map op deze computer",
+                    placeholder=r"C:\Users\...\OneDrive - ...\documents\TVB\licht-referenties",
+                    info=f"Submappen tellen mee. Bij meer dan {qb.MAX_REFERENTIES} foto's wordt een verdeelde selectie gebruikt.",
+                )
+                aantal_fotos = gr.Markdown()
                 stijl_naam_in = gr.Textbox(label="Naam van de stijl", placeholder="TVB zomercampagne")
                 backend_analyse = gr.Dropdown(BACKEND_KEUZES, value="auto", label="Backend")
                 analyse_knop = gr.Button("Analyseer stijl", variant="primary")
@@ -150,9 +207,14 @@ with gr.Blocks(title="Qwen foto-test") as demo:
                 info = gr.Textbox(label="Details", lines=5, interactive=False)
                 gekozen_stijl = gr.JSON(label="Gekozen stijl")
 
+    for bron in (referenties, map_upload):
+        bron.change(tel_referenties, inputs=[referenties, map_upload, map_pad], outputs=aantal_fotos)
+    map_pad.blur(tel_referenties, inputs=[referenties, map_upload, map_pad], outputs=aantal_fotos)
+    map_pad.submit(tel_referenties, inputs=[referenties, map_upload, map_pad], outputs=aantal_fotos)
+
     analyse_knop.click(
         leer_stijl,
-        inputs=[referenties, stijl_naam_in, backend_analyse],
+        inputs=[referenties, map_upload, map_pad, stijl_naam_in, backend_analyse],
         outputs=[stijl_samenvatting, stijl_json, stijl_keuze],
     )
     stijl_keuze.change(toon_stijl, inputs=stijl_keuze, outputs=gekozen_stijl)

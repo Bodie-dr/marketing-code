@@ -83,6 +83,102 @@ class TestOverig(unittest.TestCase):
                 qb.analyseer_stijl([Image.new("RGB", (10, 10))], backend="lokaal")
 
 
+class FotoMapTests(unittest.TestCase):
+    def test_map_met_submappen_alleen_fotos(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "sub").mkdir()
+            for naam in ["b.JPG", "a.png", "sub/c.webp", "notitie.txt", "~$tijdelijk.jpg", ".verborgen.png"]:
+                (root / naam).write_bytes(b"x")
+            los = root / "los.jpeg"
+            los.write_bytes(b"x")
+
+            gevonden = qb.verzamel_fotos([str(root), f'"{los}"', None, ""])
+
+        self.assertEqual([p.name for p in gevonden], ["a.png", "b.JPG", "los.jpeg", "c.webp"])
+
+    def test_zelfde_foto_niet_dubbel(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as folder:
+            foto = Path(folder) / "a.jpg"
+            foto.write_bytes(b"x")
+            self.assertEqual(len(qb.verzamel_fotos([folder, str(foto)])), 1)
+
+    def test_verdeelde_selectie(self):
+        paden = list(range(40))
+        self.assertEqual(qb.kies_verdeeld(paden, 4), [0, 10, 20, 30])
+        self.assertEqual(qb.kies_verdeeld(paden[:5], 12), [0, 1, 2, 3, 4])
+        self.assertEqual(len(qb.kies_verdeeld(paden, 12)), 12)
+        self.assertEqual(qb.kies_verdeeld(paden, 0), paden)
+
+
+class KleurpaletTests(unittest.TestCase):
+    def foto(self, vlakken):
+        """Foto met verticale banen: [(kleur, breedte), ...]."""
+        breedte = sum(w for _, w in vlakken)
+        foto = Image.new("RGB", (breedte, 50))
+        x = 0
+        for kleur, w in vlakken:
+            foto.paste(kleur, (x, 0, x + w, 50))
+            x += w
+        return foto
+
+    def test_echte_kleuren_en_aandelen(self):
+        import kleurpalet as kp
+
+        foto = self.foto([((60, 60, 60), 70), ((200, 200, 200), 20), ((30, 90, 200), 10)])
+        palet = kp.extraheer_palet([foto], aantal=3, accenten=2)
+
+        hoofd = {k["hex"]: k["aandeel"] for k in palet if k["soort"] == "hoofd"}
+        self.assertEqual(set(hoofd), {"#3C3C3C", "#C8C8C8", "#1E5AC8"})
+        self.assertAlmostEqual(hoofd["#3C3C3C"], 0.7, places=2)
+        accenten = [k for k in palet if k["soort"] == "accent"]
+        self.assertEqual([k["hex"] for k in accenten], ["#1E5AC8"])  # alleen het blauw is gekleurd
+
+    def test_klein_accent_wordt_gevonden_naast_grote_grijze_vlakken(self):
+        import kleurpalet as kp
+
+        foto = self.foto([((120, 120, 120), 97), ((20, 110, 220), 3)])
+        palet = kp.extraheer_palet([foto], aantal=1, accenten=1)
+
+        self.assertEqual([k["soort"] for k in palet], ["hoofd", "accent"])
+        self.assertEqual(palet[1]["hex"], "#146EDC")
+
+    def test_grijze_foto_heeft_geen_accenten(self):
+        import kleurpalet as kp
+
+        palet = kp.extraheer_palet([self.foto([((90, 90, 90), 50), ((180, 180, 180), 50)])])
+        self.assertFalse([k for k in palet if k["soort"] == "accent"])
+
+    def test_lab_omzetting_heen_en_terug(self):
+        import numpy as np
+
+        import kleurpalet as kp
+
+        rgb = np.array([[0, 0, 0], [255, 255, 255], [34, 45, 79], [56, 181, 168]], dtype=float)
+        self.assertTrue(np.array_equal(kp.lab_naar_rgb(kp.rgb_naar_lab(rgb)), rgb.astype(int)))
+
+    def test_analyse_gebruikt_gemeten_kleuren_niet_die_van_het_model(self):
+        import json
+
+        model_antwoord = json.dumps({**STIJL, "kleurpalet": ["#1ABC9C", "#E74C3C", "#8E44AD"]})
+        foto = self.foto([((60, 60, 60), 80), ((30, 90, 200), 20)])
+        with mock.patch.object(qb, "_analyseer_cloud", return_value=model_antwoord) as analyse:
+            stijl, _ = qb.analyseer_stijl([foto], backend="cloud")
+
+        self.assertNotIn("#1ABC9C", stijl["kleurpalet"])
+        self.assertIn("#3C3C3C", stijl["kleurpalet"])
+        self.assertEqual(stijl["kleurpalet"], [k["hex"] for k in stijl["kleurpalet_details"]])
+        instructie = analyse.call_args[0][1]
+        self.assertIn("Gemeten kleuren", instructie)
+        self.assertIn("#3C3C3C", instructie)
+
+
 class HfFoutTests(unittest.TestCase):
     def test_ongeldige_token_geeft_duidelijke_melding(self):
         fout = qb._vertaal_hf_fout(Exception(
