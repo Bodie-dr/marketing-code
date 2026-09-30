@@ -83,5 +83,26 @@ class TestOverig(unittest.TestCase):
                 qb.analyseer_stijl([Image.new("RGB", (10, 10))], backend="lokaal")
 
 
+class HfFoutTests(unittest.TestCase):
+    def test_ongeldige_token_geeft_duidelijke_melding(self):
+        fout = qb._vertaal_hf_fout(Exception(
+            "Client error '401 Unauthorized' for url 'https://router.huggingface.co/v1/chat/completions'"
+            "\n\nInvalid username or password."
+        ))
+        self.assertIsInstance(fout, PermissionError)
+        self.assertIn("nieuwe token", str(fout))
+
+    def test_ontbrekende_permissie_en_tegoed(self):
+        self.assertIn(
+            "Make calls to Inference Providers",
+            str(qb._vertaal_hf_fout(Exception("403 Forbidden: Inference Providers niet toegestaan"))),
+        )
+        self.assertIn("tegoed", str(qb._vertaal_hf_fout(Exception("402 Payment Required"))))
+
+    def test_andere_fout_blijft_ongewijzigd(self):
+        origineel = Exception("500 Server Error")
+        self.assertIs(qb._vertaal_hf_fout(origineel), origineel)
+
+
 if __name__ == "__main__":
     unittest.main()

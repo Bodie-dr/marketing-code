@@ -8,6 +8,7 @@ import logging
 import os
 
 import gradio as gr
+from gradio.themes import Base
 from PIL import Image
 
 import qwen_backend as qb
@@ -168,6 +169,6 @@ if __name__ == "__main__":
     demo.queue().launch(
         server_name="127.0.0.1",
         server_port=int(os.environ.get("QWEN_PORT", 7861)),
-        theme=gr.themes.Base(primary_hue="cyan", secondary_hue="blue", neutral_hue="slate"),
+        theme=Base(primary_hue="cyan", secondary_hue="blue", neutral_hue="slate"),
         css=APP_CSS,
     )

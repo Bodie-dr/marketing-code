@@ -18,6 +18,7 @@ import io
 import json
 import os
 import re
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
@@ -179,6 +180,13 @@ def _hf_client():
 
 def _vertaal_hf_fout(fout: Exception) -> Exception:
     tekst = str(fout)
+    if "401" in tekst:
+        return PermissionError(
+            "Hugging Face weigert je HF_TOKEN (ongeldig, verlopen of ingetrokken). "
+            "Maak op huggingface.co/settings/tokens een nieuwe token met de permissie "
+            "'Make calls to Inference Providers', zet die in .env als HF_TOKEN "
+            "en herstart de app."
+        )
     if "403" in tekst and "Inference Providers" in tekst:
         return PermissionError(
             "Je HF_TOKEN mag geen Inference Providers aanroepen. Maak op "
@@ -190,7 +198,7 @@ def _vertaal_hf_fout(fout: Exception) -> Exception:
     return fout
 
 
-def _analyseer_cloud(fotos: list[Image.Image]) -> str:
+def _analyseer_cloud(fotos: Sequence[Image.Image]) -> str:
     inhoud = [{"type": "image_url", "image_url": {"url": naar_data_url(f)}} for f in fotos]
     inhoud.append({"type": "text", "text": ANALYSE_INSTRUCTIE})
     try:
@@ -251,7 +259,7 @@ def _laad_vl():
     return _vl_model, _vl_processor
 
 
-def _analyseer_lokaal(fotos: list[Image.Image]) -> str:
+def _analyseer_lokaal(fotos: Sequence[Image.Image]) -> str:
     _controleer_gpu()
     with _lokaal_lock:
         model, processor = _laad_vl()
@@ -311,7 +319,7 @@ def _bewerk_lokaal(foto: Image.Image, prompt: str, stappen: int, seed: int) -> I
 # --------------------------------------------------
 
 
-def analyseer_stijl(fotos: list[Image.Image], backend: str | None = None) -> tuple[dict, str]:
+def analyseer_stijl(fotos: Sequence[Image.Image], backend: str | None = None) -> tuple[dict, str]:
     """Leer de gemeenschappelijke stijl van één of meer referentiefoto's."""
     if not fotos:
         raise ValueError("Upload minstens één referentiefoto.")
