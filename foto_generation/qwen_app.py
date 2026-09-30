@@ -3,6 +3,8 @@ Qwen test-app: stijl leren uit referentiefoto's en foto's daarmee bewerken.
 
 Starten:  python foto_generation/qwen_app.py
 """
+from huggingface_hub import whoami
+print("Account:", whoami()["name"])
 
 import logging
 import os
@@ -144,6 +146,19 @@ def ververs_stijlen():
     return gr.update(choices=["(geen)"] + qb.stijl_namen())
 
 
+def verwijder_stijl(naam, bevestigd="ja"):
+    if bevestigd != "ja":
+        return gr.update()
+    if not naam or naam == "(geen)":
+        raise gr.Error("Kies eerst een stijl om te verwijderen.")
+    try:
+        pad = qb.verwijder_stijl(naam)
+    except ValueError as fout:
+        raise gr.Error(str(fout)) from fout
+    gr.Info(f"Stijl '{naam}' verwijderd. Terugzetten kan vanuit {pad.parent}.")
+    return gr.update(choices=["(geen)"] + qb.stijl_namen(), value="(geen)")
+
+
 with gr.Blocks(title="Qwen foto-test") as demo:
     gr.Markdown("# Qwen foto-test")
     gr.Markdown(backend_uitleg())
@@ -197,6 +212,8 @@ with gr.Blocks(title="Qwen foto-test") as demo:
                         ["(geen)"] + qb.stijl_namen(), value="(geen)", label="Stijl"
                     )
                     ververs_knop = gr.Button("↻", scale=0, min_width=40)
+                    verwijder_knop = gr.Button("🗑", scale=0, min_width=40, variant="stop")
+                    verwijder_bevestiging = gr.Textbox(value="ja", visible=False)
                 with gr.Accordion("Instellingen", open=False):
                     stappen = gr.Slider(10, 50, value=30, step=1, label="Stappen")
                     seed = gr.Number(value=42, precision=0, label="Seed")
@@ -219,6 +236,16 @@ with gr.Blocks(title="Qwen foto-test") as demo:
     )
     stijl_keuze.change(toon_stijl, inputs=stijl_keuze, outputs=gekozen_stijl)
     ververs_knop.click(ververs_stijlen, outputs=stijl_keuze)
+    verwijder_knop.click(
+        verwijder_stijl,
+        inputs=[stijl_keuze, verwijder_bevestiging],
+        outputs=stijl_keuze,
+        # Vraag eerst om bevestiging in de browser; "nee" doet niets.
+        js=(
+            "(naam, _) => [naam, (naam && naam !== '(geen)')"
+            " ? (confirm(`Stijl '${naam}' verwijderen?`) ? 'ja' : 'nee') : 'ja']"
+        ),
+    )
     bewerk_knop.click(
         pas_foto_aan,
         inputs=[foto_in, instructie, stijl_keuze, stappen, seed, backend_edit],

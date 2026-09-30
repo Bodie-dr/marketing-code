@@ -39,6 +39,8 @@ CLOUD_EDIT_MODEL = os.getenv("QWEN_EDIT_MODEL", "Qwen/Qwen-Image-Edit-2511")
 
 # Grotere foto's maken de analyse traag en duur, zonder betere stijlherkenning.
 MAX_ANALYSE_ZIJDE = 1024
+# Langste zijde van de foto die naar het cloud-edit-model gaat.
+MAX_EDIT_ZIJDE = int(os.getenv("QWEN_MAX_EDIT_ZIJDE", "2048"))
 
 STIJL_VELDEN = (
     "samenvatting",
@@ -211,6 +213,21 @@ def laad_stijl(naam: str) -> dict:
     return json.loads((STIJL_DIR / f"{naam}.json").read_text(encoding="utf-8"))
 
 
+PRULLENBAK_DIR = STIJL_DIR / "_prullenbak"
+
+
+def verwijder_stijl(naam: str) -> Path:
+    """Verplaats een stijl naar de prullenbak (terugzetten = bestand terugslepen)."""
+    bron = STIJL_DIR / f"{veilige_naam(naam)}.json"
+    if not bron.is_file():
+        raise ValueError(f"Stijl '{naam}' bestaat niet.")
+    PRULLENBAK_DIR.mkdir(parents=True, exist_ok=True)
+    doel = PRULLENBAK_DIR / bron.name
+    if doel.exists():
+        doel = PRULLENBAK_DIR / f"{bron.stem}_{datetime.now():%Y%m%d-%H%M%S}.json"
+    return bron.replace(doel)
+
+
 # --------------------------------------------------
 # Cloud (Hugging Face Inference Providers)
 # --------------------------------------------------
@@ -240,6 +257,11 @@ def _vertaal_hf_fout(fout: Exception) -> Exception:
             "huggingface.co/settings/tokens een token met de permissie "
             "'Make calls to Inference Providers' en zet die in .env als HF_TOKEN."
         )
+    if "413" in tekst:
+        return ValueError(
+            "De foto is te groot voor de server. Verlaag QWEN_MAX_EDIT_ZIJDE in .env "
+            "(bijvoorbeeld naar 1536) en probeer opnieuw."
+        )
     if "402" in tekst:
         return PermissionError("Je Hugging Face-tegoed voor Inference Providers is op.")
     return fout
@@ -260,16 +282,43 @@ def _analyseer_cloud(fotos: Sequence[Image.Image], instructie: str = ANALYSE_INS
     return antwoord.choices[0].message.content
 
 
-def _bewerk_cloud(foto: Image.Image, prompt: str, stappen: int, seed: int) -> Image.Image:
+def upload_bytes(foto: Image.Image, max_zijde: int | None = None) -> bytes:
+    """Verklein en comprimeer een foto voor de cloud.
+
+    Een camerafoto als PNG is al snel 40+ MB; dat weigert de server (413).
+    Het edit-model maakt zelf beelden van ±1-2 megapixel, dus groter
+    versturen levert geen betere kwaliteit op.
+    """
     buffer = io.BytesIO()
-    foto.convert("RGB").save(buffer, format="PNG")
+    verklein(foto, max_zijde or MAX_EDIT_ZIJDE).save(buffer, format="JPEG", quality=92)
+    return buffer.getvalue()
+
+
+def doelformaat(breedte: int, hoogte: int, megapixels: float = 1.6) -> tuple[int, int]:
+    """Uitvoerformaat met dezelfde verhouding als de invoer (veelvouden van 16).
+
+    Zonder opgegeven formaat maakt de cloud-dienst een vierkant en snijdt hij
+    de zijkanten van een liggende foto af.
+    """
+    schaal = (megapixels * 1_000_000 / (breedte * hoogte)) ** 0.5
+    return (
+        max(16, round(breedte * schaal / 16) * 16),
+        max(16, round(hoogte * schaal / 16) * 16),
+    )
+
+
+def _bewerk_cloud(foto: Image.Image, prompt: str, stappen: int, seed: int) -> Image.Image:
+    from huggingface_hub import ImageToImageTargetSize
+
+    breedte, hoogte = doelformaat(*foto.size)
     try:
         return _hf_client().image_to_image(
-            buffer.getvalue(),
+            upload_bytes(foto),
             prompt=prompt,
             model=CLOUD_EDIT_MODEL,
             num_inference_steps=stappen,
             seed=seed,
+            target_size=ImageToImageTargetSize(width=breedte, height=hoogte),
         )
     except Exception as fout:
         raise _vertaal_hf_fout(fout) from fout

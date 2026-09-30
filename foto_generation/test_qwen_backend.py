@@ -179,6 +179,62 @@ class KleurpaletTests(unittest.TestCase):
         self.assertIn("#3C3C3C", instructie)
 
 
+class UploadTests(unittest.TestCase):
+    def test_grote_foto_wordt_verkleind_tot_jpeg(self):
+        import io
+
+        foto = Image.new("RGB", (6779, 4512), (40, 80, 160))
+        data = qb.upload_bytes(foto, max_zijde=2048)
+
+        with Image.open(io.BytesIO(data)) as resultaat:
+            self.assertEqual(resultaat.format, "JPEG")
+            self.assertEqual(max(resultaat.size), 2048)
+            self.assertEqual(resultaat.size, (2048, 1363))  # verhouding blijft gelijk
+        self.assertEqual(foto.size, (6779, 4512), "origineel mag niet veranderen")
+
+    def test_kleine_foto_wordt_niet_vergroot_en_rgba_werkt(self):
+        import io
+
+        data = qb.upload_bytes(Image.new("RGBA", (800, 600)), max_zijde=2048)
+        with Image.open(io.BytesIO(data)) as resultaat:
+            self.assertEqual(resultaat.size, (800, 600))
+
+    def test_doelformaat_houdt_verhouding(self):
+        for invoer in [(6779, 4512), (4512, 6779), (1000, 1000), (1920, 1080)]:
+            with self.subTest(invoer=invoer):
+                breedte, hoogte = qb.doelformaat(*invoer)
+                self.assertEqual((breedte % 16, hoogte % 16), (0, 0))
+                self.assertAlmostEqual(breedte / hoogte, invoer[0] / invoer[1], delta=0.03)
+                self.assertAlmostEqual(breedte * hoogte / 1e6, 1.6, delta=0.1)
+
+    def test_413_geeft_duidelijke_melding(self):
+        fout = qb._vertaal_hf_fout(Exception("Client error '413 Payload Too Large' for url ..."))
+        self.assertIn("QWEN_MAX_EDIT_ZIJDE", str(fout))
+
+
+class VerwijderStijlTests(unittest.TestCase):
+    def test_stijl_gaat_naar_prullenbak_en_verdwijnt_uit_lijst(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as folder:
+            stijlen = Path(folder)
+            with mock.patch.object(qb, "STIJL_DIR", stijlen), \
+                    mock.patch.object(qb, "PRULLENBAK_DIR", stijlen / "_prullenbak"):
+                qb.sla_stijl_op("Zomer campagne", STIJL, 3, "cloud")
+                qb.sla_stijl_op("Winter", STIJL, 2, "cloud")
+
+                eerste = qb.verwijder_stijl("Zomer_campagne")
+                qb.sla_stijl_op("Zomer campagne", STIJL, 3, "cloud")
+                tweede = qb.verwijder_stijl("Zomer_campagne")
+
+                self.assertEqual(qb.stijl_namen(), ["Winter"])
+                self.assertTrue(eerste.exists() and tweede.exists())
+                self.assertNotEqual(eerste, tweede, "eerder verwijderde versie niet overschrijven")
+                with self.assertRaisesRegex(ValueError, "bestaat niet"):
+                    qb.verwijder_stijl("Bestaat niet")
+
+
 class HfFoutTests(unittest.TestCase):
     def test_ongeldige_token_geeft_duidelijke_melding(self):
         fout = qb._vertaal_hf_fout(Exception(
