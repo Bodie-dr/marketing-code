@@ -1,12 +1,25 @@
 # Alle onderdelen van het project in één keer installeren:
 #   pip install -r requirements.txt
 
-# Tekstgenerator (Gradio-app)
--r text_generator/requirements.txt
-
-# Foto-generatie (Claid / Pixelcut)
+# Tekstgenerator (Gradio-app) en kennisbank
+gradio
+openai
+python-dotenv
+python-docx
+pypdf
+pillow
 requests
+numpy
+sentence-transformers
+torch
+torchvision
+tqdm
 
-# Kalender-automatisering (Excel inlezen)
+# Kalender (Excel inlezen)
 pandas
 openpyxl
+
+# Fotogeneratie (Qwen foto-app; lokaal model alleen met NVIDIA-GPU)
+huggingface_hub
+transformers
+diffusers

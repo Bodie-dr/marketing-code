@@ -1,2 +1,0 @@
-﻿"""Database package for the marketing application."""
-

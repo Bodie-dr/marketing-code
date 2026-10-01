@@ -1,18 +1,21 @@
 {
   "venvPath": ".",
   "venv": ".venv",
-  "exclude": ["**/__pycache__", ".venv", "_archief", "outputs", "**/build", "**/dist"],
+  "exclude": ["**/__pycache__", ".venv", "_archief", "outputs", "data", "**/build", "**/dist"],
   "executionEnvironments": [
     {
-      "root": "text_generator",
-      "extraPaths": ["calander_automatisering"]
+      "root": "tekstgenerator",
+      "extraPaths": ["kennisbank", "kalender"]
     },
     {
-      "root": "calander_automatisering",
-      "extraPaths": ["text_generator"]
+      "root": "kennisbank"
     },
     {
-      "root": "foto_generation"
+      "root": "kalender",
+      "extraPaths": ["tekstgenerator", "kennisbank"]
+    },
+    {
+      "root": "fotogeneratie"
     }
   ]
 }
