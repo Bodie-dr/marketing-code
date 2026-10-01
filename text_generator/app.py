@@ -28,6 +28,7 @@ from config import DOCUMENTS_FOLDER
 from document_repository import get_or_create_project, get_project_names
 
 from text_generation import generate_text
+from web_reader import lees_webpagina
 
 
 _database_ready = False
@@ -216,6 +217,14 @@ def update_modus_from_text(style_text, handmatig_gekozen=False):
 
     return "Nieuwe tekst genereren"
 
+
+def update_modus_from_bron(style_text, bron_url, handmatig_gekozen=False):
+    """Een geplakte tekst of link betekent bijna altijd: herschrijven."""
+    return update_modus_from_text(
+        f"{style_text or ''}{bron_url or ''}", handmatig_gekozen
+    )
+
+
 def validate_and_generate(
     document,
     style_text,
@@ -226,6 +235,7 @@ def validate_and_generate(
     doelgroep,
     bedrijf,
     kanaal,
+    bron_url="",
 ):
     opdracht = "\n".join(
         waarde
@@ -233,10 +243,20 @@ def validate_and_generate(
         if waarde and waarde.strip()
     )
 
-    if modus == "Tekst herschrijven" and not (document or style_text):
+    if modus == "Tekst herschrijven" and not (
+        document or style_text or (bron_url and bron_url.strip())
+    ):
         raise gr.Error(
-            "Upload of plak de oorspronkelijke tekst die je wilt herschrijven."
+            "Plak de tekst of een link, of upload het bestand dat je wilt herschrijven."
         )
+
+    if bron_url and bron_url.strip():
+        try:
+            webtekst = lees_webpagina(bron_url)
+        except ValueError as fout:
+            raise gr.Error(str(fout)) from fout
+        gr.Info(f"Tekst van de webpagina opgehaald ({len(webtekst.split())} woorden).")
+        style_text = f"{style_text or ''}\n\n{webtekst}".strip()
 
     if modus != "Tekst herschrijven" and not opdracht:
         raise gr.Error(
@@ -728,7 +748,7 @@ with gr.Blocks(
                     ),
                 )
 
-                with gr.Accordion("Bestaande tekst (optioneel)", open=False) as brontekst:
+                with gr.Accordion("Bestaande tekst of webpagina (optioneel)", open=False) as brontekst:
                     style_text = gr.Textbox(
                         label="Plak een tekst",
                         lines=6,
@@ -740,6 +760,13 @@ with gr.Blocks(
                             "Plak hier een voorbeeldtekst of stijlregels, bijv.: korte zinnen, "
                             "formele toon, veel concrete termen."
                         ),
+                    )
+
+                    bron_url = gr.Textbox(
+                        label="Of plak een link naar een webpagina",
+                        placeholder="https://www.voorbeeld.nl/nieuws/artikel",
+                        info="De app haalt de tekst van de pagina op en gebruikt die als bestaande tekst.",
+                        max_lines=1,
                     )
 
                     document = gr.File(
@@ -790,6 +817,7 @@ with gr.Blocks(
                 doelgroep,
                 bedrijf,
                 kanaal,
+                bron_url,
             ],
             outputs=[tekst_resultaat, download_file],
         )
@@ -807,11 +835,12 @@ with gr.Blocks(
             outputs=brontekst,
         )
 
-        style_text.input(
-            fn=update_modus_from_text,
-            inputs=[style_text, modus_handmatig],
-            outputs=modus,
-        )
+        for bronveld in (style_text, bron_url):
+            bronveld.input(
+                fn=update_modus_from_bron,
+                inputs=[style_text, bron_url, modus_handmatig],
+                outputs=modus,
+            )
 
         wis_button.click(
             fn=lambda: (
@@ -826,6 +855,7 @@ with gr.Blocks(
                 "LinkedIn",
                 None,
                 False,
+                "",
             ),
             inputs=[],
             outputs=[
@@ -840,6 +870,7 @@ with gr.Blocks(
                 kanaal,
                 download_file,
                 modus_handmatig,
+                bron_url,
             ],
         )
 

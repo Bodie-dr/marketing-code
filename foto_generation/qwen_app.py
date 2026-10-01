@@ -3,8 +3,7 @@ Qwen test-app: stijl leren uit referentiefoto's en foto's daarmee bewerken.
 
 Starten:  python foto_generation/qwen_app.py
 """
-from huggingface_hub import whoami
-print("Account:", whoami()["name"])
+
 
 import logging
 import os
@@ -38,14 +37,7 @@ button.primary:hover {
 """
 
 
-def backend_uitleg() -> str:
-    actief = qb.kies_backend()
-    if actief == "lokaal":
-        return "Backend **auto** gebruikt nu **lokaal** (CUDA-GPU gevonden, model Qwen-Image-2.1)."
-    return (
-        "Backend **auto** gebruikt nu **cloud** (geen CUDA-GPU gevonden). "
-        f"Analyse: `{qb.CLOUD_ANALYSE_MODEL}`, bewerken: `{qb.CLOUD_EDIT_MODEL}`."
-    )
+
 
 
 def _referentie_paden(bestanden, map_upload, map_pad):
@@ -161,7 +153,7 @@ def verwijder_stijl(naam, bevestigd="ja"):
 
 with gr.Blocks(title="Qwen foto-test") as demo:
     gr.Markdown("# Qwen foto-test")
-    gr.Markdown(backend_uitleg())
+
 
     with gr.Tab("1. Stijl leren"):
         gr.Markdown(
