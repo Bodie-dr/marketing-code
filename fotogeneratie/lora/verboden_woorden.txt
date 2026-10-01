@@ -1,0 +1,25 @@
+# Woorden die NIET in captions horen (één per regel, # = commentaar).
+# check_dataset.py waarschuwt als een caption een van deze woorden bevat.
+# Vul de productkenmerken aan met de kleur, materialen, merknaam en onderdelen van JULLIE product.
+
+# --- Stijlwoorden ---
+beautiful
+cinematic
+professional
+high quality
+masterpiece
+stunning
+aesthetic
+photorealistic
+8k
+4k
+
+# --- Productkenmerken (VOORBEELDEN - aanpassen!) ---
+# merknaam
+# productnaam
+# rood
+# red
+# metal
+# logo
+logo
+brand

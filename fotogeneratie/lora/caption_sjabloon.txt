@@ -1,0 +1,59 @@
+CAPTION-SJABLOON - product-LoRA (tvbprod)
+==========================================
+
+Elke foto krijgt een .txt-bestand met precies dezelfde naam:
+    product_001.jpg  ->  product_001.txt
+
+GOUDEN REGEL
+Beschrijf alles wat VARIEERT. Laat weg wat het model moet LEREN (het product zelf).
+Het model koppelt alles wat je niet beschrijft aan het triggerwoord.
+
+SJABLOON (in het Engels, één regel)
+    tvbprod, [wat er gebeurt / hoe het product gebruikt wordt], [omgeving], [hoek en afstand], [licht]
+
+Onderdelen:
+    1. tvbprod            altijd vooraan, altijd exact zo geschreven
+    2. wat er gebeurt     "being carried by a man in a blue jacket", "standing unused on the ground"
+    3. omgeving           "on a construction site", "in a small workshop with tools on the wall"
+    4. hoek en afstand    "seen from the side", "close-up", "wide shot", "seen from above"
+    5. licht              "overcast daylight", "warm indoor light", "bright midday sun"
+
+WEL BESCHRIJVEN
+    - personen: kleding, wat ze doen (geen namen)
+    - handen die het product vasthouden
+    - andere objecten in beeld
+    - de ruimte of plek, het weer, het licht
+    - camerahoek en afstand
+    - wat het product deels bedekt ("partially hidden behind a crate")
+
+NIET BESCHRIJVEN (dat moet het model zelf leren)
+    - kleur, vorm, materiaal of afmetingen van het product
+    - logo, merknaam, tekst op het product
+    - knoppen, onderdelen, details van het product
+    - de productnaam of het producttype zelf (gebruik alleen het triggerwoord)
+    - stijlwoorden: "beautiful", "cinematic", "professional photo", "high quality"
+
+VOORBEELDEN
+
+  Goed:
+    tvbprod, being carried by a man in an orange safety vest on a muddy construction site, seen from the side, overcast daylight
+    tvbprod, standing on a workbench next to a coffee mug and a laptop, close-up, warm indoor light
+    tvbprod, held by two hands in front of a brick wall, seen from the front, soft shade
+    tvbprod, on the floor of a busy warehouse with shelves in the background, wide shot, fluorescent light
+
+  Fout (en waarom):
+    tvbprod, a red metal device with a black logo on a table
+        -> kleur, materiaal en logo beschreven: die raken los van het triggerwoord
+    a beautiful professional photo of tvbprod
+        -> stijlwoorden en geen omgeving: het model leert niets over de context
+    tvbprod generator on a construction site
+        -> productsoort genoemd; liever alleen het triggerwoord (of houd het overal consequent hetzelfde)
+    tvbprod
+        -> te weinig: alles in de foto wordt dan aan het product gekoppeld
+
+TIPS
+    - Houd de woordkeuze consequent: kies "seen from the side" en gebruik niet afwisselend "side view".
+    - Laat automatische captions (Florence-2, JoyCaption) een eerste versie maken, maar
+      haal er daarna productbeschrijvingen en stijlwoorden uit. check_dataset.py helpt daarbij
+      met de lijst in verboden_woorden.txt.
+    - Uitsneden van dezelfde foto krijgen hun eigen caption die past bij wat er op de uitsnede staat.

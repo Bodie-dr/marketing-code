@@ -1,19 +1,10 @@
-﻿import logging
+﻿# isort: skip_file
+import logging
 import tempfile
 import os
 import sys
 from pathlib import Path
 from threading import Lock, Thread
-import gradio as gr
-from gradio.themes import Base, LocalFont
-from docx import Document
-from docx.shared import Inches
-from database import create_connection, create_schema
-from config import DOCUMENTS_FOLDER
-from document_repository import get_or_create_project, get_project_names
-
-from text_generation import generate_text
-from web_reader import lees_webpagina
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -21,7 +12,9 @@ PROJECT_DIR = APP_DIR.parent
 KENNISBANK_DIR = PROJECT_DIR / "kennisbank"
 CALENDAR_DIR = PROJECT_DIR / "kalender"
 
-
+# LET OP: dit blok moet vóór de imports hieronder staan. Het maakt de mappen
+# kennisbank/ (`database`, `config` enz.) en kalender/ vindbaar; anders volgt
+# "ModuleNotFoundError: No module named 'database'".
 for map_ in (KENNISBANK_DIR, APP_DIR):
     if str(map_) in sys.path:
         sys.path.remove(str(map_))
@@ -29,7 +22,16 @@ for map_ in (KENNISBANK_DIR, APP_DIR):
 if str(CALENDAR_DIR) not in sys.path:
     sys.path.append(str(CALENDAR_DIR))
 
+import gradio as gr  # noqa: E402
+from gradio.themes import Base, LocalFont  # noqa: E402
+from docx import Document  # noqa: E402
+from docx.shared import Inches  # noqa: E402
+from database import create_connection, create_schema  # noqa: E402
+from config import DOCUMENTS_FOLDER  # noqa: E402
+from document_repository import get_or_create_project, get_project_names  # noqa: E402
 
+from text_generation import generate_text  # noqa: E402
+from web_reader import lees_webpagina  # noqa: E402
 
 
 _database_ready = False
@@ -1009,7 +1011,7 @@ if __name__ == "__main__":
         )
 
     demo.queue().launch(
-        share=delen,
+        share=True ,
         server_name="0.0.0.0" if openbaar else "127.0.0.1",
         server_port=port,
         auth=(gebruiker, wachtwoord) if gebruiker and wachtwoord else None,

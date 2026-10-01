@@ -21,6 +21,10 @@ marketing code/
 │   ├── kalender.py           # startpunt (week, excel, ics, concepten)
 │   └── tests/
 ├── fotogeneratie/            # Qwen foto-app: stijl leren + foto bewerken
+│   ├── lora/                 # product-LoRA trainen (handleiding: lora/README.md)
+│   ├── pas_lut_toe.py        # vaste kleurstijl (.cube-LUT) toepassen
+│   ├── voeg_logo_toe.py      # TVB-logo op beelden zetten
+│   ├── assets/               # TVB-logo
 │   └── tests/
 ├── data/
 │   ├── documents/            # trainingsdocumenten, één submap per bedrijf
@@ -50,6 +54,9 @@ Alle commando's start je vanuit de projectmap.
 | Qwen foto-app starten | `python fotogeneratie/qwen_app.py` (http://127.0.0.1:7861) |
 | Kleurpalet uit foto's | `python fotogeneratie/kleurpalet.py <map> --png palet.png` |
 | Captions voor LoRA-training | `python fotogeneratie/maak_captions.py <map> --trigger tvbstijl` |
+| Product-LoRA (stap 1–8) | zie [fotogeneratie/lora/README.md](fotogeneratie/lora/README.md) |
+| Huisstijl-LUT toepassen | `python fotogeneratie/pas_lut_toe.py <map> --lut tvb_stijl.cube` |
+| TVB-logo op beelden | `python fotogeneratie/voeg_logo_toe.py <map>` |
 | Jaarplanning inlezen | `python kalender/kalender.py` |
 | Weekoverzicht | `python kalender/kalender.py week --weken 2` |
 | Planning als Excel | `python kalender/kalender.py excel` |

@@ -1,0 +1,2 @@
+# Shellscripts draaien op Linux (RunPod): altijd LF-regeleinden.
+*.sh text eol=lf
